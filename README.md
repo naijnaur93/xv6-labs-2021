@@ -52,3 +52,6 @@ To implement following functions:
 ./user/xargs.c
 ```
 
+### Test Results
+
+![image-20211010200710258](README.assets/image-20211010200710258.png)
