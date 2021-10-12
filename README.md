@@ -27,6 +27,7 @@ It will automatically run all test cases and finally give out my scores.
 # What I've Done
 
 *(subject to update because it's currently under progress)*
+**Progress: 1 / 10**
 
 ## Lab 1 - Unix Utilities
 
@@ -52,6 +53,6 @@ To implement following functions:
 ./user/xargs.c
 ```
 
-### Test Results
+# Test Results
 
 ![image-20211010200710258](README.assets/image-20211010200710258.png)
