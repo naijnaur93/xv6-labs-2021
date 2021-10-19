@@ -32,6 +32,8 @@ It will automatically run all test cases and finally give out my scores.
 
 *(subject to update because it's currently under progress)*
 
+**Progress: 1 / 10**
+
 ## Lab 1 - Unix Utilities
 
 The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/2021/labs/util.html).
@@ -48,6 +50,8 @@ To implement following functions:
 
 ### Relevant Files
 
+**REMINDER: PLEASE SWITCH TO THE CORRECT BRANCH BY: `$ git checkout util`**
+
 ```
 ./user/sleep.c
 ./user/pingpong.c
@@ -56,7 +60,9 @@ To implement following functions:
 ./user/xargs.c
 ```
 
-### Test Results
+# Test Results
+
+## Lab 1
 
 ![image-20211010200710258](README.assets/image-20211010200710258.png)
 
