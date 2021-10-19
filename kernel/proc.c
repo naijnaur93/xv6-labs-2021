@@ -656,3 +656,14 @@ procdump(void)
     printf("\n");
   }
 }
+
+uint64 getprocnum(void) {
+  int cnt = 0;
+  int i;
+  for (i = 0; i < NPROC; i++) {
+    if (proc[i].state != (enum procstate)UNUSED) {
+      cnt++;
+    }
+  }
+  return cnt;
+}
