@@ -76,14 +76,44 @@ sys_sleep(void)
 }
 
 
-#ifdef LAB_PGTBL
+//#ifdef LAB_PGTBL
 int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 va;   // the starting virtual address
+  if (argaddr(0, &va) < 0) {
+    panic("sys_pgaccess: failure to get virtual addr");
+  }
+  int pgnum;   // the number of pages to check
+  if (argint(1, &pgnum) < 0) {
+    panic("sys_pgaccess: failure to get pg num");
+  }
+  if (pgnum > 64) {
+    panic("too much pages to check!");
+  }
+  uint64 ubuf;  // the address of user buffer
+  if (argaddr(2, &ubuf) < 0) {
+    panic("sys_pgaccess: failure to get addr of user buffer");
+  }
+  uint64 buf = 0; // the output bit mask
+  for (int i = 0; i < pgnum; i++)
+  {
+    pte_t *pte_ptr = walk(myproc()->pagetable, va + i*PGSIZE, 0);
+    if (*pte_ptr & PTE_A) {  // the page which the PTE points to is accessed
+      buf |= (1L << i);      // set the output bit mask
+      *pte_ptr &= ~PTE_A;    // clear the access bit(operator~ means flop every bit)
+    }
+  }
+  // copy the buf to ubuf
+  if (copyout(myproc()->pagetable, ubuf, (char *)&buf, 8) < 0)
+  {
+    panic("error: copyout() in sys_pgaccess()");
+  }
+
   return 0;
 }
-#endif
+//#endif
 
 uint64
 sys_kill(void)
