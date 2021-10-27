@@ -127,12 +127,17 @@ found:
     return 0;
   }
 
-  // An empty user page table.
-  p->shared_page = (struct usyscall*)kalloc();
+  // Allocate the page which can be read by user.
+  if ((p->shared_page = (struct usyscall*)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
   // printf("proc %d create user page %p\n", p->pid, p->shared_page);
   memset(p->shared_page, 0, PGSIZE);
   p->shared_page->pid = p->pid;
   p->sz += PGSIZE;
+  // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
     freeproc(p);

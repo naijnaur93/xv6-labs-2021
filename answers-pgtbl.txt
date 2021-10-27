@@ -1,0 +1,3 @@
+**Question**: Which other xv6 system call(s) could be made faster using this shared page? Explain how.
+
+**Answer**: I think `fstat()` can also be made faster. We can add `struct fstat` in `strcut usyscall` and retrieve it from `struct usyscall` directly. 
