@@ -128,6 +128,11 @@ found:
   }
 
   // An empty user page table.
+  p->shared_page = (struct usyscall*)kalloc();
+  // printf("proc %d create user page %p\n", p->pid, p->shared_page);
+  memset(p->shared_page, 0, PGSIZE);
+  p->shared_page->pid = p->pid;
+  p->sz += PGSIZE;
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
     freeproc(p);
@@ -153,8 +158,11 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
+  if (p->pagetable)
+  {
+    // printf("free proc page table: %p\n", proc->pagetable);
     proc_freepagetable(p->pagetable, p->sz);
+  }
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -196,6 +204,15 @@ proc_pagetable(struct proc *p)
     return 0;
   }
 
+  if (mappages(pagetable, USYSCALL, PGSIZE,
+               (uint64)p->shared_page, PTE_R | PTE_U) < 0) {
+    printf("WARNING: failure mappages of page table : %p to USYSCALL\n", pagetable);
+    uvmfree(pagetable, 0);
+    return 0;
+  } else {
+    // printf("map pagetable %p: virtual-%p -> physical-%p\n", pagetable, USYSCALL, p->shared_page);
+  }
+
   return pagetable;
 }
 
@@ -204,6 +221,9 @@ proc_pagetable(struct proc *p)
 void
 proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
+  // printf("unmap USYSCALL in page table -- %p\n", pagetable);
+  uvmunmap(pagetable, USYSCALL, 1, 1);
+  // printf("free proc page table: %p\n", pagetable);
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
   uvmfree(pagetable, sz);

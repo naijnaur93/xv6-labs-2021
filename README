@@ -1,3 +1,37 @@
+# Lab 3 - Page Table
+
+## Task  1 - Speed up system calls
+
+### Specifics
+
+Some operating systems (e.g., Linux) speed up certain system calls by sharing data in a read-only region between userspace and the kernel. This eliminates the need for kernel crossings when performing these system calls. To help you learn how to insert mappings into a page table, your first task is to implement this optimization for the `getpid()` system call in xv6.
+
+When each process is created, map one read-only page at USYSCALL (a VA defined in `memlayout.h`). At the start of this page, store a `struct usyscall` (also defined in `memlayout.h`), and initialize it to store the PID of the current process. For this lab, `ugetpid()` has been provided on the userspace side and will automatically use the USYSCALL mapping. You will receive full credit for this part of the lab if the `ugetpid` test case passes when running `pgtbltest`.
+
+Some hints:
+
+- You can perform the mapping in `proc_pagetable()` in `kernel/proc.c`.
+- Choose permission bits that allow userspace to only read the page.
+- You may find that `mappages()` is a useful utility.
+- Don't forget to allocate and initialize the page in `allocproc()`.
+- Make sure to free the page in `freeproc()`.
+
+### PitFalls
+
+**The last hint is misleading.** I free the page in `proc_freepagetable()` instead of `freeproc()`.
+
+When the system boot up, it will call `allocproc()`, which will allocate and map the use page. After that, `free_pagetable()` will be called to free the page table created by `allocproc()`. Therefore, if I free the user page in `freeproc()`, the user page will not be freed in the process of booting up, and it will cause panic `freewalk: leaf`. **In a word, if I free the user page only in `freeproc()`, the system will not successfully boot up.**
+
+Besides, if I unmap the user page in `freeproc()`, the system will boot up as normal. But if I call the test, it will run into the problem "repeated free". Because when the process is going to terminate, the `freeproc()` will be called to free its structure.  However, `freeproc()` itself will call `proc_freepagetable()` to free its page table. If I perform the operation of freeing the user page in `freeproc()`, it is doomed to free the user page twice, which is an error. 
+
+
+
+
+
+
+
+
+
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
 Version 6 (v6).  xv6 loosely follows the structure and style of v6,
 but is implemented for a modern RISC-V multiprocessor using ANSI C.
