@@ -81,7 +81,25 @@ kernel/syscall.c
 kernel/kalloc.c
 ```
 
+## Lab 3 - Page Table
 
+The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/2021/labs/pgtbl.html).
+
+### Tasks
+
+To implement the following three functions in the kernel:
+
+- **Make it possible for processes in user mode to directly retrieve `pid` without entering kernel.** When each process is created, map one read-only page at USYSCALL (a VA defined in memlayout.h). At the start of this page, store a struct usyscall (also defined in memlayout.h), and initialize it to store the PID of the current process. 
+- `vmprint()`: It should take a pagetable_t argument, and print that pagetable.
+- `sys_pgaccess()`: return the info of accessed pages to the buffer passed in by user.
+
+### Relevant Files and Test
+
+**See the report in the branch `pgtbl` by:**
+
+```
+$ git checkout pgtbl
+```
 
 # Test Results
 
