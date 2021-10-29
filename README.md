@@ -17,7 +17,7 @@ Additionally, it offers `$ make grade` for grading the whole lab.
 
 #### 2021/10/29
 
-**I RECEIVED FULL SCORE IN `$ make grade` **. The two problems of my previous implementations are that:
+**I RECEIVED FULL SCORE IN `$ make grade`**. The two problems of my previous implementations are that:
 
 1. *In `proc_freepagetable()`, I should just unmap the user page instead of unmapping and freeing it by calling `uvmunmap(pagetable, USYSCALL, 1)`.* This problem caused the test `execout()` to `panic: kerneltrap`.
 2. *I should call `kfree()` to free the user page in `freeproc()` before it calls `proc_freepagetable()`.* This problem caused the `usertests` loss of free pages because it did not free the user page. 
@@ -61,6 +61,12 @@ Some hints:
 See my code in [`kernel/proc.c`](./kernel/proc.c).
 
 ### Pitfalls
+
+#### UPDATE AFTER COMPLETE THE LAB
+
+**The hint is right.** The page should be freed in `freeproc()`, then unmapped in `proc_freepagetable()`. If only unmap it in `proc_freepagetable()` and want it to be freed by `uvmunmap()`, the system will suffer loss of free pages.
+
+#### ORIGINAL THOUGHTS
 
 **The last hint is misleading.** I free the page in `proc_freepagetable()` instead of `freeproc()`.
 
