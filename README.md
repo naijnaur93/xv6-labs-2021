@@ -43,7 +43,7 @@ It will automatically run all test cases and finally give out my scores.
 
 *(subject to update because it's currently under progress)*
 
-**Progress: 2 / 10**
+**Progress: 3 / 10**
 
 ## Lab 1 - Unix Utilities
 
@@ -123,3 +123,5 @@ To implement the following three functions in the kernel:
 ## Lab 3
 
 ![image-20211029112834529](README.assets/image-20211029112834529.png)
+
+**Note**: *The `usertests` is time-consuming. If your computer has a weak performance, the `usertests` may fail because of time out.*
