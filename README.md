@@ -1,18 +1,29 @@
-[toc]
-
-
-
 # FOREWORD
 
 This is a **portal** for my project of [MIT 6.S081(Operating System), 2021 Fall](https://pdos.csail.mit.edu/6.S081/2021/schedule.html). 
 
 You can get a glance at what I've done in this project. To further inspect/test my code, please switch branches and see instructions below.
 
+# Build Instructions
+
+**BEFORE BUILDING AND TESTING MY CODE, MAKE SURE THAT YOU HAVE SET UP BUILDING ENVIRONMENT!!!**
+
+### For Debian Or Ubuntu
+
+```
+$ sudo apt-get update && sudo apt-get upgrade
+$ sudo apt-get install git build-essential gdb-multiarch qemu-system-misc gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu
+```
+
+### For Other Systems
+
+**Please refer to [instructions on the course website](https://pdos.csail.mit.edu/6.S081/2021/tools.html).**
+
 # Test Instructions
 
 The test can ONLY be done one by one. 
 
-To inspect my code, first switch to the branch you wish. For example, if you want to see my implementation of `Lab Util`, first type:
+To inspect my code, **first switch to the branch you wish.** For example, if you want to see my implementation of `Lab Util`, first type:
 
 ```
 $ git checkout util
@@ -89,17 +100,15 @@ The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/
 
 To implement the following three functions in the kernel:
 
-- **Make it possible for processes in user mode to directly retrieve `pid` without entering kernel.** When each process is created, map one read-only page at USYSCALL (a VA defined in memlayout.h). At the start of this page, store a struct usyscall (also defined in memlayout.h), and initialize it to store the PID of the current process. 
-- `vmprint()`: It should take a pagetable_t argument, and print that pagetable.
+- **Make it possible for processes in user mode to directly retrieve `pid` without entering kernel.** When each process is created, map one read-only page at `USYSCALL` (a VA defined in `memlayout.h`). At the start of this page, store a `struct usyscall` (also defined in `memlayout.h`), and initialize it to store the `PID` of the current process. 
+- `vmprint()`: It should take a `pagetable_t` argument, and print that `pagetable`.
 - `sys_pgaccess()`: return the info of accessed pages to the buffer passed in by user.
 
-### Relevant Files and Test
+### Relevant Files
 
-**See the report in the branch `pgtbl` by:**
+**REMINDER: PLEASE SWITCH TO THE CORRECT BRANCH BY: `$ git checkout pgtbl`**
 
-```
-$ git checkout pgtbl
-```
+**See the report in the branch `pgtbl`**
 
 # Test Results
 
@@ -107,7 +116,10 @@ $ git checkout pgtbl
 
 ![image-20211010200710258](README.assets/image-20211010200710258.png)
 
-### Lab 2
+## Lab 2
 
 ![image-20211019210027385](README.assets/image-20211019210027385.png)
 
+## Lab 3
+
+![image-20211029112834529](README.assets/image-20211029112834529.png)
