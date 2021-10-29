@@ -15,6 +15,19 @@ Additionally, it offers `$ make grade` for grading the whole lab.
 
 ### Results
 
+#### 2021/10/29
+
+**I RECEIVED FULL SCORE IN `$ make grade` **. The two problems of my previous implementations are that:
+
+1. *In `proc_freepagetable()`, I should just unmap the user page instead of unmapping and freeing it by calling `uvmunmap(pagetable, USYSCALL, 1)`.* This problem caused the test `execout()` to `panic: kerneltrap`.
+2. *I should call `kfree()` to free the user page in `freeproc()` before it calls `proc_freepagetable()`.* This problem caused the `usertests` loss of free pages because it did not free the user page. 
+
+In a word, the free of the page and the unmap of the page should be separated. 
+
+I cannot explain it for now. In the code, `uvmunmap()` will call `kfree()` to free the unmapped page if I want it to do so. 
+
+#### 2021/10/28
+
 **I PASSED ALL TESTS FOR THE THREE TASK**, but there are some potential errors in my implementation of *Task 1*, so `usertests` fails. 
 
 **`usertests::execout()`**, which is to test whether the system will behave normally when the memory is full, crashes because of the potential errors.
@@ -169,7 +182,7 @@ Some hints:
 ### Solutions
 
 1. Use `argint()` and `argaddr()` to get *the starting virtual address*, *the number of pages to check*, and *the user address to a buffer*.
-2. Iterate through all pages, check their access bit. 
+2. Iterate through all pages, check their access bit*(the sixth bit in a PTE, defined as `#define PTE_A (1L << 6)` in `kernel/riscv.h`)*. 
 3. If the bit is set, unset it and set corresponding bit in the user buffer. Otherwise do nothing.
 
 See my code in [`kernel/sysproc.c: sys_pgaccess()`](./kernel/sysproc.c).
