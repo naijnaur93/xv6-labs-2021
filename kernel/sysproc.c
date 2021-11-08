@@ -96,3 +96,30 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_sigalarm(void) {
+  myproc()->time_since_last_call = 0;
+  int interval;
+  if (argint(0, &interval)) {
+    panic("sys_sigalarm: fail to get interval!");
+  }
+  uint64 handler_addr;
+  if (argaddr(1, &handler_addr)) {
+    panic("sys_alarm: fail to get the handler address!");
+  }
+  myproc()->alarm_interval = interval;
+  myproc()->fn = handler_addr;
+  return 0;
+}
+
+uint64
+sys_sigreturn(void) {
+  struct proc *p = myproc();
+  if (p->shadow_frame) {
+    *(p->trapframe) = *(p->shadow_frame);
+    kfree((void *)(p->shadow_frame));
+    p->shadow_frame = 0;
+  }
+  return 0;
+}

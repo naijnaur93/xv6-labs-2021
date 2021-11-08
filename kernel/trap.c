@@ -77,8 +77,26 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2) {
     yield();
+    p->time_since_last_call++;
+    if (p->time_since_last_call == p->alarm_interval) {
+      p->time_since_last_call = 0;
+      if (!p->shadow_frame) {   // if there's shadow frame, then we are processing handler
+        // else we can process the current alarm
+        // first save everything in the trapframe
+        // they will be used to restore the interrupted user code
+        p->shadow_frame = (struct trapframe *)kalloc();
+        *(p->shadow_frame) = *(p->trapframe);
+        // change epc to the handler's address
+        // handler will be executed when usertrapret() finished
+        // it will exactly jump to where epc points to
+        p->trapframe->epc = p->fn;
+      }
+      // NOTE: here is KERNEL space, we CANNOT call p->fn, which is the alarm handler
+      // ((void (*)(void))(p->fn))();
+    }
+  }
 
   usertrapret();
 }
@@ -137,7 +155,8 @@ kerneltrap()
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
-  
+  struct proc *p = myproc();
+
   if((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");
   if(intr_get() != 0)
@@ -150,8 +169,15 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING) {
     yield();
+    p->time_since_last_call++;
+    if (p->time_since_last_call == p->alarm_interval)
+    {
+      p->time_since_last_call = 0;
+      p->trapframe->epc = p->fn;
+    }
+  }
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.

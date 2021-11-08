@@ -119,6 +119,10 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->alarm_interval = 0;  // not set yet
+  p->time_since_last_call = 0;  // not set yet
+  p->fn = 0;              // not set yet
+  p->shadow_frame = 0;    // now we are not going to proceed alarm handler, so the shadow frame is NULL
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
