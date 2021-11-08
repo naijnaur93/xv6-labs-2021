@@ -1,0 +1,41 @@
+Q: Which registers contain arguments to functions? For example, which register holds 13 in `main`'s call to `printf`?
+
+A: `a0` ~ `a7` store arguments. For example, `a0` holds the address of the formatting string, `a1` holds `12` and `a2` holds 13. 
+
+
+Q: Where is the call to function `f` in the assembly code for `main`? Where is the call to `g`? (Hint: the compiler may inline functions.)
+
+A: In the assembly code, there's no call to `f` and `g` in `main` because the complier inlined the call to `f` and computed the result(i.e. (f(8)+1) = 12). 
+   So the instruction at `  26:	45b1                	li	a1,12` already get the return value.
+
+
+Q: At what address is the function `printf` located?
+
+A: At `  34:	600080e7          	jalr	1536(ra) # 630 <printf>`, we can know that `printf` located at `0x630`.
+
+
+Q: What value is in the register `ra` just after the `jalr` to `printf` in `main`?
+
+A: Because `ra` holds the return address, so the `ra` holds `0x38` after the `jalr` to `printf` in `main`.
+
+
+Q: Run the following code.
+
+```c
+	unsigned int i = 0x00646c72;
+	printf("H%x Wo%s", 57616, &i);
+```
+
+What's the output? 
+The output depends on that fact that the RISC-V is little-endian. If the RISC-V were instead big-endian what would you set i to in order to yield the same output? Would you need to change 57616 to a different value?
+
+A: The output is `HE110 World`.
+
+
+Q: In the following code, what is going to be printed after 'y='? (note: the answer is not a specific value.) Why does this happen?
+
+```c
+	printf("x=%d y=%d", 3);
+```
+
+A: If we want to print `%d` parameter, the `printf` will call `vfrintf`, in which parameters are passed in by the stack and the `%d` paramter will be stored in `s8`. Because we do not have passed in the parameter for `y = %d`, so the corresponding stack pointer points to unused (or meaningless) space, which accounts for the undefined value.
