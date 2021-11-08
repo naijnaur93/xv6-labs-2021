@@ -110,6 +110,21 @@ To implement the following three functions in the kernel:
 
 **See the report in the branch `pgtbl`**
 
+## Lab 4 - Traps
+
+The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/2021/labs/traps.html).
+
+### Tasks
+
+- Implement the `bakctrace` function to print out the return addresses of the functions which are called.
+- Implement `sigalarm(int ticks, (void *handler)())` so that it will set an alarm which will set off at the interval of `ticks`. When the alarm set off, the system will call the `handler` function to handle the alarm. Call `sigalarm(0, 0)` to unset the alarm.
+
+### Relevant Files
+
+**REMINDER: PLEASE SWITCH TO THE CORRECT BRANCH BY: `$ git checkout traps`**
+
+**See the report in the branch `traps`**
+
 # Test Results
 
 ## Lab 1
@@ -125,3 +140,7 @@ To implement the following three functions in the kernel:
 ![image-20211029112834529](README.assets/image-20211029112834529.png)
 
 **Note**: *The `usertests` is time-consuming. If your computer has a weak performance, the `usertests` may fail because of time out.*
+
+## Lab 4
+
+![image-20211108211249012](README.assets/image-20211108211249012.png)
