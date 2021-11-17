@@ -39,11 +39,11 @@ $ make grade
 
 It will automatically run all test cases and finally give out my scores.
 
-# What I've Done
+# Project Overview
 
 *(subject to update because it's currently under progress)*
 
-**Progress: 3 / 10**
+**Progress: 4 / 10**
 
 ## Lab 1 - Unix Utilities
 
