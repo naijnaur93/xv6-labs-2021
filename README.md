@@ -43,7 +43,7 @@ It will automatically run all test cases and finally give out my scores.
 
 *(subject to update because it's currently under progress)*
 
-**Progress: 4 / 10**
+**Progress: 5 / 10**
 
 ## Lab 1 - Unix Utilities
 
@@ -125,6 +125,32 @@ The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/
 
 **See the report in the branch `traps`**
 
+## Lab 5 - Copy-On-Write
+
+The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/2021/labs/cow.html).
+
+### Tasks
+
+To implement copy-on-write fork in the xv6 kernel.
+
+#### Specification
+
+The goal of copy-on-write (COW) `fork()` is to defer allocating and copying physical memory pages for the child until the copies are actually needed, if ever.
+
+COW `fork()` creates just a pagetable for the child, with PTEs for user memory pointing to the parent's physical pages. COW fork() marks all the user PTEs in both parent and child as not writable. When either process tries to write one of these COW pages, the CPU will force a page fault. The kernel page-fault handler detects this case, allocates a page of physical memory for the faulting process, copies the original page into the new page, and modifies the relevant PTE in the faulting process to refer to the new page, this time with the PTE marked writeable. When the page fault handler returns, the user process will be able to write its copy of the page.
+
+COW `fork()` makes freeing of the physical pages that implement user memory a little trickier. A given physical page may be referred to by multiple processes' page tables, and should be freed only when the last reference disappears.
+
+### Detailed Reports
+
+**REMINDER: PLEASE SWITCH TO THE CORRECT BRANCH BY: **
+
+```
+$ git checkout cow
+```
+
+**See the report in the branch `cow`**
+
 # Test Results
 
 ## Lab 1
@@ -144,3 +170,9 @@ The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/
 ## Lab 4
 
 ![image-20211108211249012](README.assets/image-20211108211249012.png)
+
+## Lab 5
+
+*__Note__: This lab still has bugs in concurrency and `execout()` test.*
+
+![image-20211126204354733](README.assets/image-20211126204354733.png)
