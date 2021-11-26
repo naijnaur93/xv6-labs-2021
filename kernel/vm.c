@@ -15,7 +15,6 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
-extern uint8 ref_count[];
 extern int print_flag;
 
 // Make a direct-map page table for the kernel.
@@ -152,8 +151,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
     if(*pte & PTE_V){
-      printf("[ERROR] mappages: remap\n");
-      break;
+      panic("[ERROR] mappages: remap\n");
     }
     *pte = PA2PTE(pa) | perm | PTE_V;
     // if (print_flag)
@@ -187,16 +185,8 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if(do_free){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
-    }
-    if (ref_count[PGIDX(PTE2PA(*pte))] != 0) {
-      ref_count[PGIDX(PTE2PA(*pte))]--;
-      // printf("uvmunmap %p -> %d in pagetable: %p\n--ref_count[%d], = %d\n",
-      //        a, PGIDX(PTE2PA(*pte)), pagetable,
-      //        PGIDX(PTE2PA(*pte)),
-      //        ref_count[PGIDX(PTE2PA(*pte))]);
     } else {
-      // printf("[WARN] uvmunmap(), ref_count[%d], decrease a zero count!\n",
-      //        PGIDX(PTE2PA(*pte)));
+      decrease_ref(PTE2PA(*pte));
     }
     *pte = 0;
   }
@@ -332,7 +322,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     *pte |= PTE_RSW1;
     flags = PTE_FLAGS(*pte);
     // map the new pagetable to the same address as the old
-    ref_count[(PTE2PA(*pte) - KERNBASE) / PGSIZE]++;
+    increase_ref((uint64)PTE2PA(*pte));
 
     //  printf("uvmcopy(), ++ref_count[%d], = %d\n", (PTE2PA(*pte) - KERNBASE) / PGSIZE, ref_count[(PTE2PA(*pte)-KERNBASE)/PGSIZE]);
     if (mappages(new, i, PGSIZE, pa, flags) != 0) {
@@ -373,7 +363,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     // check whether its a COW page
     if ((*pte) & PTE_RSW1) {
       // printf("copyout(), encountered a COW page, ref_count[%d] = %d\n", PGIDX(pa0), ref_count[PGIDX(pa0)]);
-      if (ref_count[PGIDX(pa0)] == 1) {
+      if (get_ref_count(pa0) == 1) {
         // printf("This page only have one ref, restore its W permission and continue copy\n");
         *pte |= PTE_W;
         *pte &= ~PTE_RSW1;

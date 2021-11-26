@@ -23,15 +23,50 @@ struct {
   struct run *freelist;
 } kmem;
 
-uint8 ref_count[(PHYSTOP - KERNBASE) / PGSIZE];
+struct RefCount
+{
+  struct spinlock lock;
+  uint8 ref_count[(PHYSTOP - KERNBASE) / PGSIZE];
+} ref_count;
 
 extern int print_flag;
+
+void decrease_ref(uint64 pa) {
+  acquire(&ref_count.lock);
+  if (ref_count.ref_count[PGIDX(pa)] > 0) {
+    ref_count.ref_count[PGIDX(pa)]--;
+  } else if (print_flag) {
+    // printf("[WARN] Try to decrease a zero count page @%d\n", PGIDX(pa));
+  }
+  release(&ref_count.lock);
+}
+
+void increase_ref(uint64 pa) {
+  acquire(&ref_count.lock);
+  ref_count.ref_count[PGIDX(pa)]++;
+  release(&ref_count.lock);
+}
+
+uint8 get_ref_count(uint64 pa) {
+  uint8 ret;
+  acquire(&ref_count.lock);
+  ret = ref_count.ref_count[PGIDX(pa)];
+  release(&ref_count.lock);
+  return ret;
+}
 
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+
+  initlock(&ref_count.lock, "ref_count");
+  for (int i = 0; i < (PHYSTOP - KERNBASE) / PGSIZE; i++) {
+    acquire(&ref_count.lock);
+    ref_count.ref_count[i] = 0;
+    release(&ref_count.lock);
+  }
 }
 
 void
@@ -55,15 +90,12 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  if (ref_count[((uint64)pa - KERNBASE) / PGSIZE] == 1) {
-    // free the page allocated at the booting process
-    ref_count[((uint64)pa - KERNBASE) / PGSIZE]--;
-  }
+  decrease_ref((uint64)pa);
 
-  if (ref_count[((uint64)pa - KERNBASE) / PGSIZE] != 0) {
+  if (get_ref_count((uint64)pa) != 0) {
     // printf("[PROMPT] ref_count[%d] = %d, kfree() not performed\n",
-    //        ((uint64)pa - KERNBASE) / PGSIZE,
-    //        ref_count[((uint64)pa - KERNBASE) / PGSIZE]);
+    //        PGIDX(pa),
+    //        get_ref_count((uint64)pa));
     return;
   }
 
@@ -100,7 +132,13 @@ kalloc(void)
     if ((uint64)r < KERNBASE) {
       panic("kalloc, Impossible free space pointer!");
     }
-    ref_count[((uint64)r-KERNBASE)/PGSIZE] = 1;  // set the ref_count to 1
+    increase_ref((uint64)r);  // set the ref_count to 1
+    // check sanity
+    if (get_ref_count((uint64)r) != 1) {
+      printf("[ERROR] kalloc(), ref_count[%d] = %d\n", PGIDX(r),
+             get_ref_count((uint64)r));
+      panic("kalloc(), impossible ref count!");
+    }
     // printf("[PROMPT] ref_count[%d] set to 1 in kalloc()\n",
     //       ((uint64)r - KERNBASE) / PGSIZE);
   }
