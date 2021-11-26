@@ -8,10 +8,12 @@
 #include "elf.h"
 
 static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
+extern int print_flag;
 
 int
 exec(char *path, char **argv)
 {
+  print_flag = 1;
   char *s, *last;
   int i, off;
   uint64 argc, sz = 0, sp, ustack[MAXARG], stackbase;
@@ -57,6 +59,7 @@ exec(char *path, char **argv)
     if(loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0)
       goto bad;
   }
+  // printf("exec(), after loadseg, proc sz = %d\n", sz);
   iunlockput(ip);
   end_op();
   ip = 0;
@@ -126,7 +129,7 @@ exec(char *path, char **argv)
     end_op();
   }
   return -1;
-}
+ }
 
 // Load a program segment into pagetable at virtual address va.
 // va must be page-aligned

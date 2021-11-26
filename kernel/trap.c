@@ -16,6 +16,8 @@ void kernelvec();
 
 extern int devintr();
 
+extern uint8 ref_count[];
+
 void
 trapinit(void)
 {
@@ -49,7 +51,10 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
+
+  uint64 faulting_va = r_stval();
+  uint64 faulting_pa = walkaddr(p->pagetable, faulting_va);
+
   if(r_scause() == 8){
     // system call
 
@@ -67,6 +72,60 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (r_scause() == 15 &&
+             ref_count[(faulting_pa - KERNBASE) / PGSIZE] > 1) {
+    // read/write fault, allocate new pages to the process
+    // printf("usertrap(), captured a page fault, copy mem, ref_count[%d] = %d, faulting va = %p\n",
+    //        (faulting_pa - KERNBASE) / PGSIZE,
+    //        ref_count[(faulting_pa - KERNBASE) / PGSIZE], faulting_va);
+  
+    char *mem;
+    if ((mem = kalloc()) == 0) {
+      // no memory available, kill the process
+      p->killed = 1;
+    }
+    memmove(mem, (char *)PGROUNDDOWN(faulting_pa), PGSIZE);
+
+    uint flags = PTE_FLAGS(*walk(p->pagetable, faulting_va, 0));
+    // unset the COW bit, give write permission
+    flags &= ~PTE_RSW1;
+    flags |= PTE_W;
+
+    uvmunmap(p->pagetable, PGROUNDDOWN(faulting_va), 1, 0);
+
+    if (mappages(p->pagetable, PGROUNDDOWN(faulting_va), PGSIZE, (uint64)mem, flags) != 0) {
+      // fail to map, kill the process
+      kfree(mem);
+      p->killed = 1;
+    }
+  } else if (r_scause() == 15 &&
+             ref_count[(faulting_pa - KERNBASE) / PGSIZE] == 1) {
+    // read/write fault, but since now the faulting va is the ONLY one
+    // holds the page, we can just unset its COW bit and make it writable
+
+    // printf("page fault captured, set the W bit\n");
+    pte_t *faulting_pte;
+    if ((faulting_pte = walk(p->pagetable, faulting_va, 0)) != 0) {
+      // unset the COW bit, give write permission
+      *faulting_pte &= ~PTE_RSW1;
+      *faulting_pte |= PTE_W;
+    } else {
+      panic("cannot find PTE for the faulting va!");
+    }
+  } else if (r_scause() == 15 &&
+             ref_count[(faulting_pa - KERNBASE) / PGSIZE] == 0) {
+    // abnormal case, give debug output
+
+    // printf("[ERROR] encountered a zero-referred page, ref_count[%d] = 0\n",
+    //        (faulting_pa - KERNBASE) / PGSIZE);
+    pte_t *faulting_pte;
+    if ((faulting_pte = walk(p->pagetable, faulting_va, 0)) != 0) {
+      // unset the COW bit, give write permission
+      *faulting_pte &= ~PTE_RSW1;
+      *faulting_pte |= PTE_W;
+    } else {
+      panic("cannot find PTE for the faulting va!");
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
@@ -144,8 +203,10 @@ kerneltrap()
     panic("kerneltrap: interrupts enabled");
 
   if((which_dev = devintr()) == 0){
-    printf("scause %p\n", scause);
+    printf("kernel_trap(): scause %p\n", scause);
     printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+    printf("ref_count[%d] = %d\n", (r_stval() - KERNBASE) / PGSIZE,
+           ref_count[(r_stval() - KERNBASE) / PGSIZE]);
     panic("kerneltrap");
   }
 

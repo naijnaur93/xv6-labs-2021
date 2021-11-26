@@ -20,6 +20,8 @@ static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
 
+int print_flag = 0;
+
 // helps ensure that wakeups of wait()ing
 // parents are not lost. helps obey the
 // memory model when using p->parent.
@@ -272,6 +274,7 @@ growproc(int n)
 int
 fork(void)
 {
+  print_flag = 1;
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
