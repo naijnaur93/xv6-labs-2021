@@ -72,7 +72,7 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else if (r_scause() == 15 &&
+  } else if (r_scause() == 15 && faulting_va < MAXVA &&
              ref_count[(faulting_pa - KERNBASE) / PGSIZE] > 1) {
     // read/write fault, allocate new pages to the process
     // printf("usertrap(), captured a page fault, copy mem, ref_count[%d] = %d, faulting va = %p\n",
@@ -98,7 +98,7 @@ usertrap(void)
       kfree(mem);
       p->killed = 1;
     }
-  } else if (r_scause() == 15 &&
+  } else if (r_scause() == 15 && faulting_va < MAXVA &&
              ref_count[(faulting_pa - KERNBASE) / PGSIZE] == 1) {
     // read/write fault, but since now the faulting va is the ONLY one
     // holds the page, we can just unset its COW bit and make it writable
@@ -112,7 +112,7 @@ usertrap(void)
     } else {
       panic("cannot find PTE for the faulting va!");
     }
-  } else if (r_scause() == 15 &&
+  } else if (r_scause() == 15 && faulting_va < MAXVA &&
              ref_count[(faulting_pa - KERNBASE) / PGSIZE] == 0) {
     // abnormal case, give debug output
 

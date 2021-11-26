@@ -365,6 +365,9 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   va0 = PGROUNDDOWN(dstva);
   pa0 = walkaddr(pagetable, va0);
+  if (pa0 == 0) {
+    return -1;
+  }
   pte_t *pte = walk(pagetable, va0, 0);
   if (pte != 0) {
     // check whether its a COW page
