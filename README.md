@@ -1,5 +1,3 @@
-*My initial commit `27296ef533384c7db0292cd7f9c96d7f28c1d339` passed more `usertests`.* 
-
 ### Pitfalls
 
 - Decrease the page reference count in `kfree()` instead of other places suck as `uvmunmap()`. 
