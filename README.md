@@ -23,7 +23,9 @@ $ make CPUS=1 qemu
 
 Then the `usertests` will succeed(except `execout()` test) without loss of any pages. 
 
-However, if the `xv6` is running in double cores, the `usertests` will fail because when it executes all tests, the system lost some free pages. In another word, the system did not free all the allocated pages. 
+However, if the `xv6` is running in **double cores**, the `usertests` will **fail** because when it executes all tests, the system lost some free pages. In another word, the system did not free all the allocated pages. 
+
+*I tested `forktest` and `echo` in __double core__ situation, both of which __DID NOT suffer loss of free pages__.*
 
 ##### Assumption
 
