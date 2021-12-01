@@ -62,7 +62,7 @@ Some hints:
   <del>*The bug in this lab has something to do with it. See the following section discussing about the bug.*</del>
 - <del>There should be some mechanism to free pages when memory is out in `exec()`. But it seems that `exec()` provides that mechanism. </del>
   <del>*I do not know how my implementation of COW disturbs the `exec()`.*</del>
-  They are caused by the bug in `usertrap()` when it is handling page fault but there's no free pages, see [the next section](#Solution-3).
+  They are caused by the bug in `usertrap()` when it is handling page fault but there's no free pages, see [the next section](#Solution-2).
 
 ### Remaining Bugs [None]
 
@@ -102,7 +102,7 @@ Always acquire `ref_count.lock` before reading and writing to `ref_count` and re
 
 #### [FIXED] Panic When Memory Is Out
 
-**THE BUG IS FIXED, SEE [THE _SOLUTION_ PART](#solution-3)!**
+**THE BUG IS FIXED, SEE [THE _SOLUTION_ PART](#solution-2)!**
 
 ##### Description
 
