@@ -15,7 +15,10 @@ extern char trampoline[], uservec[], userret[];
 void kernelvec();
 
 extern int devintr();
-
+extern struct RefCount {
+  struct spinlock lock;
+  uint8 ref_count[(PHYSTOP - KERNBASE) / PGSIZE];
+} ref_count;
 
 void
 trapinit(void)
@@ -78,11 +81,14 @@ usertrap(void)
     // faulting va = %p\n",
     //        PGIDX(faulting_pa),
     //        get_ref_count(faulting_pa), faulting_va);
+    acquire(&ref_count.lock);
 
     char *mem;
     if ((mem = kalloc()) == 0) {
       // no memory available, kill the process
       p->killed = 1;
+      release(&ref_count.lock);
+      goto exit;
     }
     memmove(mem, (char *)PGROUNDDOWN(faulting_pa), PGSIZE);
 
@@ -98,8 +104,10 @@ usertrap(void)
       kfree(mem);
       p->killed = 1;
     }
+    release(&ref_count.lock);
   } else if (r_scause() == 15 && faulting_va < MAXVA &&
              get_ref_count(faulting_pa) == 1) {
+    acquire(&ref_count.lock);
     // read/write fault, but since now the faulting va is the ONLY one
     // holds the page, we can just unset its COW bit and make it writable
 
@@ -112,8 +120,10 @@ usertrap(void)
     } else {
       panic("cannot find PTE for the faulting va!");
     }
+    release(&ref_count.lock);
   } else if (r_scause() == 15 && faulting_va < MAXVA &&
              get_ref_count(faulting_pa) == 0) {
+    acquire(&ref_count.lock);
     // abnormal case, give debug output
 
     printf("[ERROR] encountered a zero-referred page, ref_count[%d] = 0\n",
@@ -126,12 +136,13 @@ usertrap(void)
     } else {
       panic("cannot find PTE for the faulting va!");
     }
+    release(&ref_count.lock);
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
   }
-
+exit:
   if(p->killed)
     exit(-1);
 

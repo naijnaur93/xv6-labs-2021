@@ -1,7 +1,7 @@
 ### Pitfalls
 
-- Decrease the page reference count in `kfree()` instead of other places suck as `uvmunmap()`. 
-  Because in `kalloc()` the `ref_count` is increased by 1 unconditionally, there will not be any problem to decrease it in `kfree()`.
+- Decrease the page reference count in `kfree()` instead of other places such as `uvmunmap()`. 
+  *Because in `kalloc()` the `ref_count` is increased by 1 unconditionally, there will not be any problem to decrease it in `kfree()`.*
 - The increase, decrease and read the `ref_count` of a page need a spin lock held. Otherwise there will be concurrency problems. 
   *The bug in this lab has something to do with it. See the following section discussing about the bug.*
 - There should be some mechanism to free pages when memory is out in `exec()`. But it seems that `exec()` provides that mechanism. 
@@ -9,7 +9,7 @@
 
 ### Remaining Bugs
 
-Both of the two bugs are related to the page freeing problems. 
+There are sometimes weird bugs when I'm running `usertests`. I believe they are caused by **CONCURRENCY CONTROL** because these bugs occur randomly, which fits the characters of concurrent situation. 
 
 #### Free Page In CONCURRENCY Situation
 
@@ -37,7 +37,7 @@ A elegant locking scheme is necessary, but I have not come up with one.
 
 I tried some schemes, but they may cause problems in the normal cases.
 
-#### Free Pages When Memory Is Out
+#### [FIXED] Panic When Memory Is Out
 
 ##### Description
 
@@ -62,4 +62,19 @@ panic: kerneltrap
 
 I can see that it is first caused by page fault by the instruction at `0x000000008000026c`, which want to access `0x0000000000000000`. 
 
-The other outputs are not important since the first line has ruined the sanity of memory. 
+Because I add a `printf()` just before the `panic()`, when the first panic occurs, it may ruin the sanity of memory. Therefore, the other outputs are not important.
+
+##### Update on 01/21/2021
+
+![image-20211201160327745](README.assets/image-20211201160327745.png)
+
+*In the `gdb` window above, I set a break point at `0x000000008000026c` to see what instruction caused the kernel trap to panic.*
+
+According to `gdb` and the source code, I found that the `execout()` caused page fault in `kalloc()` when it is calling `sbrk()` to allocate all memory. 
+
+As we can see, the faulting instruction is merely judging whether `r` is empty. If `r` is empty, it means that there's no free spaces and `kalloc()` should not execute any allocation of memory and just return `0x0`.
+
+<del>Therefore, the bug is weird: If I did not access the address `0x0`, how could the xv6 raises the page fault indicating that I was trying to write something to the address`0x0`?</del>
+
+**UPDATE: The bug is fixed, I do not know when it is fixed, neither do I know the exact cause of it because when I wanted to catch it, it disappeared.**
+

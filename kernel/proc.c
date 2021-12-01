@@ -21,6 +21,10 @@ static void freeproc(struct proc *p);
 extern char trampoline[]; // trampoline.S
 
 int print_flag = 0;
+extern struct RefCount {
+  struct spinlock lock;
+  uint8 ref_count[(PHYSTOP - KERNBASE) / PGSIZE];
+} ref_count;
 
 // helps ensure that wakeups of wait()ing
 // parents are not lost. helps obey the

@@ -32,27 +32,19 @@ struct RefCount
 extern int print_flag;
 
 void decrease_ref(uint64 pa) {
-  acquire(&ref_count.lock);
   if (ref_count.ref_count[PGIDX(pa)] > 0) {
     ref_count.ref_count[PGIDX(pa)]--;
   } else if (print_flag) {
     // printf("[WARN] Try to decrease a zero count page @%d\n", PGIDX(pa));
   }
-  release(&ref_count.lock);
 }
 
 void increase_ref(uint64 pa) {
-  acquire(&ref_count.lock);
   ref_count.ref_count[PGIDX(pa)]++;
-  release(&ref_count.lock);
 }
 
 uint8 get_ref_count(uint64 pa) {
-  uint8 ret;
-  acquire(&ref_count.lock);
-  ret = ref_count.ref_count[PGIDX(pa)];
-  release(&ref_count.lock);
-  return ret;
+  return ref_count.ref_count[PGIDX(pa)];
 }
 
 void
@@ -62,11 +54,11 @@ kinit()
   freerange(end, (void*)PHYSTOP);
 
   initlock(&ref_count.lock, "ref_count");
+  acquire(&ref_count.lock);
   for (int i = 0; i < (PHYSTOP - KERNBASE) / PGSIZE; i++) {
-    acquire(&ref_count.lock);
     ref_count.ref_count[i] = 0;
-    release(&ref_count.lock);
   }
+  release(&ref_count.lock);
 }
 
 void
@@ -87,6 +79,9 @@ kfree(void *pa)
 {
   acquire(&kmem.lock);
   struct run *r;
+  if (print_flag) {
+    // printf("[PROMPT] freeing page: %d\n",PGIDX(pa));
+  }
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
@@ -101,9 +96,6 @@ kfree(void *pa)
     return;
   }
 
-  if (print_flag) {
-    // printf("[PROMPT] freeing page: %d\n",PGIDX(pa));
-  }
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
