@@ -143,7 +143,7 @@ COW `fork()` makes freeing of the physical pages that implement user memory a li
 
 ### Detailed Reports
 
-**REMINDER: PLEASE SWITCH TO THE CORRECT BRANCH BY: **
+**REMINDER: PLEASE SWITCH TO THE CORRECT BRANCH BY:**
 
 ```
 $ git checkout cow
