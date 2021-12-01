@@ -6,7 +6,7 @@
 
 The goal of copy-on-write (COW) fork() is to defer allocating and copying physical memory pages for the child until the copies are actually needed, if ever.
 
-COW fork() creates just a pagetable for the child, with PTEs for user memory pointing to the parent's physical pages. COW fork() marks all the user PTEs in both parent and child as not writable. When either process tries to write one of these COW pages, the CPU will force a page fault. The kernel page-fault handler detects this case, allocates a page of physical memory for the faulting process, copies the original page into the new page, and modifies the relevant PTE in the faulting process to refer to the new page, this time with the PTE marked writeable. When the page fault handler returns, the user process will be able to write its copy of the page.
+COW fork() creates just a `pagetable` for the child, with `PTE`s for user memory pointing to the parent's physical pages. COW fork() marks all the user `PTE`s in both parent and child as not writable. When either process tries to write one of these COW pages, the CPU will force a page fault. The kernel page-fault handler detects this case, allocates a page of physical memory for the faulting process, copies the original page into the new page, and modifies the relevant `PTE` in the faulting process to refer to the new page, this time with the `PTE` marked writeable. When the page fault handler returns, the user process will be able to write its copy of the page.
 
 COW fork() makes freeing of the physical pages that implement user memory a little trickier. A given physical page may be referred to by multiple processes' page tables, and should be freed only when the last reference disappears.
 
@@ -14,35 +14,65 @@ COW fork() makes freeing of the physical pages that implement user memory a litt
 
 Here's a reasonable plan of attack.
 
-1. Modify uvmcopy() to map the parent's physical pages into the child, instead of allocating new pages. Clear `PTE_W` in the PTEs of both child and parent.
-2. Modify usertrap() to recognize page faults. When a page-fault occurs on a COW page, allocate a new page with kalloc(), copy the old page to the new page, and install the new page in the PTE with `PTE_W` set.
-3. Ensure that each physical page is freed when the last PTE reference to it goes away -- but not before. A good way to do this is to keep, for each physical page, a "reference count" of the number of user page tables that refer to that page. Set a page's reference count to one when `kalloc()` allocates it. Increment a page's reference count when fork causes a child to share the page, and decrement a page's count each time any process drops the page from its page table. `kfree()` should only place a page back on the free list if its reference count is zero. It's OK to to keep these counts in a fixed-size array of integers. You'll have to work out a scheme for how to index the array and how to choose its size. For example, you could index the array with the page's physical address divided by 4096, and give the array a number of elements equal to highest physical address of any page placed on the free list by `kinit()` in kalloc.c.
-4. Modify copyout() to use the same scheme as page faults when it encounters a COW page.
+1. Modify `uvmcopy()` to map the parent's physical pages into the child, instead of allocating new pages. Clear `PTE_W` in the ``PTE``s of both child and parent.
+2. Modify `usertrap()` to recognize page faults. When a page-fault occurs on a COW page, allocate a new page with `kalloc()`, copy the old page to the new page, and install the new page in the `PTE` with `PTE_W` set.
+3. Ensure that each physical page is freed when the last `PTE` reference to it goes away -- but not before. A good way to do this is to keep, for each physical page, a "reference count" of the number of user page tables that refer to that page. Set a page's reference count to one when `kalloc()` allocates it. Increment a page's reference count when fork causes a child to share the page, and decrement a page's count each time any process drops the page from its page table. `kfree()` should only place a page back on the free list if its reference count is zero. It's OK to to keep these counts in a fixed-size array of integers. You'll have to work out a scheme for how to index the array and how to choose its size. For example, you could index the array with the page's physical address divided by 4096, and give the array a number of elements equal to highest physical address of any page placed on the free list by `kinit()` in `kalloc.c`.
+4. Modify `copyout()` to use the same scheme as page faults when it encounters a COW page.
 
 Some hints:
 
 - The lazy page allocation lab has likely made you familiar with much of the xv6 kernel code that's relevant for copy-on-write. However, you should not base this lab on your lazy allocation solution; instead, please start with a fresh copy of xv6 as directed above.
-- It may be useful to have a way to record, for each PTE, whether it is a COW mapping. You can use the RSW (reserved for software) bits in the RISC-V PTE for this.
+- It may be useful to have a way to record, for each `PTE`, whether it is a COW mapping. You can use the `RSW` (reserved for software) bits in the RISC-V `PTE` for this.
 - `usertests` explores scenarios that `cowtest` does not test, so don't forget to check that all tests pass for both.
 - Some helpful macros and definitions for page table flags are at the end of `kernel/riscv.h`.
 - If a COW page fault occurs and there's no free memory, the process should be killed.
 
 ## Solution
 
+1. Construct a reference count `struct` to record the reference count of each page by:
+
+   ```c
+   struct RefCount
+   {
+     struct spinlock lock;
+     uint8 ref_count[(PHYSTOP - KERNBASE) / PGSIZE];
+   } ref_count;
+   ```
+
+2. In [`kernel/kalloc.c:kinit()`](kernel/kalloc.c), initialize `ref_count.lock` and set all `ref_count` to 0 in `kinit()`;
+   In `kalloc()`, after allocating a new page, increase its `ref_count`;
+   In `kfree()`, first decrease the page's `ref_count`, then free the page if its `ref_count == 0`.
+
+3. In  [`kernel/vm.c:uvmcopy()`](kernel/vm.c) , map the parent's physical pages into the child, instead of allocating new pages. Clear `PTE_W` and set `PTE_RSW1` in the `PTE`s of both child and parent.
+
+4. In [`kernel/trap.c:usertrap()`](kernel/trap.c), before processing the trap, first acquire `ref_count.lock`(**THE READING AND WRITING OF `ref_count` MUST BE PROTECTED BY ITS LOCK!!!**), then:
+   **4.1.** If it is a system call (`r_scause() == 8`), then release `ref_count.lock` immediately, do not modify anything;
+   **4.2.** If it is a page fault (`r_scause() == 15`), and its reference count is **greater than** 1 (which means one of its referrer want to write something to it), allocate a new duplication of it, unset the new page's `COW` bit and set the `PTE_W` bit. **REMEMBER TO CHECK WHETHER THE `va` OF THE FAULTING PAGE IS POSSIBLE!!!**
+   **4.3.** If it is a page fault (`r_scause() == 15`), and its reference count **is** 1 (which means its ONLY referrer want to write something to it), make the page write-able and unset the `COW` bit.
+   **4.4.** Otherwise it is an abnormal situation, give the warning output.
+   **4.5. AFTER EVERY PROCESSING, REMEMBER TO RELEASE `ref_count.lock`!!!**
+
+5. In [`kernel/vm.c:copyout()`](kernel/vm.c), use the same mechanism above.
+
 ### Pitfalls
 
 - Decrease the page reference count in `kfree()` instead of other places such as `uvmunmap()`. 
   *Because in `kalloc()` the `ref_count` is increased by 1 unconditionally, there will not be any problem to decrease it in `kfree()`.*
 - The increase, decrease and read the `ref_count` of a page need a spin lock held. Otherwise there will be concurrency problems. 
-  *The bug in this lab has something to do with it. See the following section discussing about the bug.*
-- There should be some mechanism to free pages when memory is out in `exec()`. But it seems that `exec()` provides that mechanism. 
-  *I do not know how my implementation of COW disturbs the `exec()`.*
+  <del>*The bug in this lab has something to do with it. See the following section discussing about the bug.*</del>
+- <del>There should be some mechanism to free pages when memory is out in `exec()`. But it seems that `exec()` provides that mechanism. </del>
+  <del>*I do not know how my implementation of COW disturbs the `exec()`.*</del>
+  They are caused by the bug in `usertrap()` when it is handling page fault but there's no free pages, see [the next section](#Solution-3).
 
-### Remaining Bugs
+### Remaining Bugs [None]
+
+**Update on 01/12/2021: ALL BUGS ARE FIXED**
+
+-------------------------------------------------------------------------------------------------------------------
 
 There are sometimes weird bugs when I'm running `usertests`. I believe they are caused by **CONCURRENCY CONTROL** because these bugs occur randomly, which fits the characters of concurrent situation. 
 
-#### Free Page In CONCURRENCY Situation
+#### [FIXED] Free Page In CONCURRENCY Situation
 
 ##### Description
 
@@ -52,7 +82,7 @@ If I make the `xv6` running in single core mode:
 $ make CPUS=1 qemu
 ```
 
-Then the `usertests` will succeed(except `execout()` test) without loss of any pages. 
+Then the `usertests` will succeed<del>(except `execout()` test)</del> without loss of any pages. 
 
 However, if the `xv6` is running in **double cores**, the `usertests` will **fail** because when it executes all tests, the system lost some free pages. In another word, the system did not free all the allocated pages. 
 
@@ -64,13 +94,13 @@ I suppose that it is because under concurrent situation, `kfree()` may read a no
 
 ##### Solution
 
-A elegant locking scheme is necessary, but I have not come up with one.
+<del>A elegant locking scheme is necessary, but I have not come up with one.</del>
 
-I tried some schemes, but they may cause problems in the normal cases.
+<del>I tried some schemes, but they may cause problems in the normal cases.</del>
 
 #### [FIXED] Panic When Memory Is Out
 
-**THE BUG IS FIXED, SEE THE _SOLUTION_ PART!**
+**THE BUG IS FIXED, SEE [THE _SOLUTION_ PART](#solution-3)!**
 
 ##### Description
 
@@ -111,7 +141,7 @@ Therefore, the bug is weird: If I did not access the address `0x0`, how could th
 
 ##### Solution
 
-Here's the code about how I handled the page fault in `trap.c:usertrap()`:
+Here's the BUGGY code about how I handled the page fault in `trap.c:usertrap()`
 
 ```c
 if (r_scause() == 15 && faulting_va < MAXVA &&
@@ -145,6 +175,6 @@ if (r_scause() == 15 && faulting_va < MAXVA &&
     release(&ref_count.lock);
 ```
 
-Note `line 13`, I intend to kill the process when the memory is unavailable, but I did not stop the execution of `memmove`, so when `kalloc()` returned 0, it still move the contents to the address `0x0`, which cause the kernel trap to panic. 
+Note: `line 13`, I intend to kill the process when the memory is unavailable, but I did not stop the execution of `memmove`, so when `kalloc()` returned 0, it still move the contents to the address `0x0`, which cause the kernel trap to panic. 
 
 So I need to jump out of the `if` clause when `kalloc()` returns 0.

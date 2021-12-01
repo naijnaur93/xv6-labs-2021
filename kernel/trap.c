@@ -57,8 +57,10 @@ usertrap(void)
 
   uint64 faulting_va = r_stval();
   uint64 faulting_pa = walkaddr(p->pagetable, faulting_va);
+  acquire(&ref_count.lock);
 
-  if(r_scause() == 8){
+  if (r_scause() == 8) {
+    release(&ref_count.lock);
     // system call
 
     if(p->killed)
@@ -73,11 +75,11 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } else if ((which_dev = devintr()) != 0) {
+    release(&ref_count.lock);
     // ok
   } else if (r_scause() == 15 && faulting_va < MAXVA &&
              get_ref_count(faulting_pa) > 1) {
-    acquire(&ref_count.lock);
     // read/write fault, allocate new pages to the process
     // printf("usertrap(), captured a page fault, copy mem, ref_count[%d] = %d,
     // faulting va = %p\n",
@@ -108,7 +110,6 @@ usertrap(void)
     release(&ref_count.lock);
   } else if (r_scause() == 15 && faulting_va < MAXVA &&
              get_ref_count(faulting_pa) == 1) {
-    acquire(&ref_count.lock);
     // read/write fault, but since now the faulting va is the ONLY one
     // holds the page, we can just unset its COW bit and make it writable
 
@@ -124,7 +125,6 @@ usertrap(void)
     release(&ref_count.lock);
   } else if (r_scause() == 15 && faulting_va < MAXVA &&
              get_ref_count(faulting_pa) == 0) {
-    acquire(&ref_count.lock);
     // abnormal case, give debug output
 
     printf("[ERROR] encountered a zero-referred page, ref_count[%d] = 0\n",
@@ -139,6 +139,7 @@ usertrap(void)
     }
     release(&ref_count.lock);
   } else {
+    release(&ref_count.lock);
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
