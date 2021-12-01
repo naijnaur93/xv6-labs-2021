@@ -112,9 +112,9 @@ kfree(void *pa)
 void *
 kalloc(void)
 {
+  acquire(&kmem.lock);
   struct run *r;
 
-  acquire(&kmem.lock);
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;

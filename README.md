@@ -1,3 +1,34 @@
+# Lab 5 - Copy-On-Write
+
+[Here](https://pdos.csail.mit.edu/6.S081/2021/labs/cow.html) is the original lab specifics.
+
+## Task
+
+The goal of copy-on-write (COW) fork() is to defer allocating and copying physical memory pages for the child until the copies are actually needed, if ever.
+
+COW fork() creates just a pagetable for the child, with PTEs for user memory pointing to the parent's physical pages. COW fork() marks all the user PTEs in both parent and child as not writable. When either process tries to write one of these COW pages, the CPU will force a page fault. The kernel page-fault handler detects this case, allocates a page of physical memory for the faulting process, copies the original page into the new page, and modifies the relevant PTE in the faulting process to refer to the new page, this time with the PTE marked writeable. When the page fault handler returns, the user process will be able to write its copy of the page.
+
+COW fork() makes freeing of the physical pages that implement user memory a little trickier. A given physical page may be referred to by multiple processes' page tables, and should be freed only when the last reference disappears.
+
+## Some hints
+
+Here's a reasonable plan of attack.
+
+1. Modify uvmcopy() to map the parent's physical pages into the child, instead of allocating new pages. Clear `PTE_W` in the PTEs of both child and parent.
+2. Modify usertrap() to recognize page faults. When a page-fault occurs on a COW page, allocate a new page with kalloc(), copy the old page to the new page, and install the new page in the PTE with `PTE_W` set.
+3. Ensure that each physical page is freed when the last PTE reference to it goes away -- but not before. A good way to do this is to keep, for each physical page, a "reference count" of the number of user page tables that refer to that page. Set a page's reference count to one when `kalloc()` allocates it. Increment a page's reference count when fork causes a child to share the page, and decrement a page's count each time any process drops the page from its page table. `kfree()` should only place a page back on the free list if its reference count is zero. It's OK to to keep these counts in a fixed-size array of integers. You'll have to work out a scheme for how to index the array and how to choose its size. For example, you could index the array with the page's physical address divided by 4096, and give the array a number of elements equal to highest physical address of any page placed on the free list by `kinit()` in kalloc.c.
+4. Modify copyout() to use the same scheme as page faults when it encounters a COW page.
+
+Some hints:
+
+- The lazy page allocation lab has likely made you familiar with much of the xv6 kernel code that's relevant for copy-on-write. However, you should not base this lab on your lazy allocation solution; instead, please start with a fresh copy of xv6 as directed above.
+- It may be useful to have a way to record, for each PTE, whether it is a COW mapping. You can use the RSW (reserved for software) bits in the RISC-V PTE for this.
+- `usertests` explores scenarios that `cowtest` does not test, so don't forget to check that all tests pass for both.
+- Some helpful macros and definitions for page table flags are at the end of `kernel/riscv.h`.
+- If a COW page fault occurs and there's no free memory, the process should be killed.
+
+## Solution
+
 ### Pitfalls
 
 - Decrease the page reference count in `kfree()` instead of other places such as `uvmunmap()`. 
@@ -39,6 +70,8 @@ I tried some schemes, but they may cause problems in the normal cases.
 
 #### [FIXED] Panic When Memory Is Out
 
+**THE BUG IS FIXED, SEE THE _SOLUTION_ PART!**
+
 ##### Description
 
 `execout()` will cause a kernel panic, which makes it difficult for me to debug.
@@ -58,13 +91,13 @@ ref_count[65545] = 0
 panic: kerneltrap
 ```
 
-#### Assumption
+##### Assumption
 
 I can see that it is first caused by page fault by the instruction at `0x000000008000026c`, which want to access `0x0000000000000000`. 
 
 Because I add a `printf()` just before the `panic()`, when the first panic occurs, it may ruin the sanity of memory. Therefore, the other outputs are not important.
 
-##### Update on 01/21/2021
+###### Update on 01/21/2021
 
 ![image-20211201160327745](README.assets/image-20211201160327745.png)
 
@@ -74,7 +107,44 @@ According to `gdb` and the source code, I found that the `execout()` caused page
 
 As we can see, the faulting instruction is merely judging whether `r` is empty. If `r` is empty, it means that there's no free spaces and `kalloc()` should not execute any allocation of memory and just return `0x0`.
 
-<del>Therefore, the bug is weird: If I did not access the address `0x0`, how could the xv6 raises the page fault indicating that I was trying to write something to the address`0x0`?</del>
+Therefore, the bug is weird: If I did not access the address `0x0`, how could the xv6 raises the page fault indicating that I was trying to write something to the address`0x0`?
 
-**UPDATE: The bug is fixed, I do not know when it is fixed, neither do I know the exact cause of it because when I wanted to catch it, it disappeared.**
+##### Solution
 
+Here's the code about how I handled the page fault in `trap.c:usertrap()`:
+
+```c
+if (r_scause() == 15 && faulting_va < MAXVA &&
+             get_ref_count(faulting_pa) > 1) {
+    acquire(&ref_count.lock);
+    // read/write fault, allocate new pages to the process
+    // printf("usertrap(), captured a page fault, copy mem, ref_count[%d] = %d,
+    // faulting va = %p\n",
+    //        PGIDX(faulting_pa),
+    //        get_ref_count(faulting_pa), faulting_va);
+
+    char *mem;
+    if ((mem = kalloc()) == 0) {
+      // no memory available, kill the process
+      p->killed = 1;
+    }
+    memmove(mem, (char *)PGROUNDDOWN(faulting_pa), PGSIZE);
+
+    uint flags = PTE_FLAGS(*walk(p->pagetable, faulting_va, 0));
+    // unset the COW bit, give write permission
+    flags &= ~PTE_RSW1;
+    flags |= PTE_W;
+
+    uvmunmap(p->pagetable, PGROUNDDOWN(faulting_va), 1, 0);
+
+    if (mappages(p->pagetable, PGROUNDDOWN(faulting_va), PGSIZE, (uint64)mem, flags) != 0) {
+      // fail to map, kill the process
+      kfree(mem);
+      p->killed = 1;
+    }
+    release(&ref_count.lock);
+```
+
+Note `line 13`, I intend to kill the process when the memory is unavailable, but I did not stop the execution of `memmove`, so when `kalloc()` returned 0, it still move the contents to the address `0x0`, which cause the kernel trap to panic. 
+
+So I need to jump out of the `if` clause when `kalloc()` returns 0.

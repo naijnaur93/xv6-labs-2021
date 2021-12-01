@@ -15,6 +15,7 @@ extern char trampoline[], uservec[], userret[];
 void kernelvec();
 
 extern int devintr();
+
 extern struct RefCount {
   struct spinlock lock;
   uint8 ref_count[(PHYSTOP - KERNBASE) / PGSIZE];
@@ -76,13 +77,13 @@ usertrap(void)
     // ok
   } else if (r_scause() == 15 && faulting_va < MAXVA &&
              get_ref_count(faulting_pa) > 1) {
+    acquire(&ref_count.lock);
     // read/write fault, allocate new pages to the process
     // printf("usertrap(), captured a page fault, copy mem, ref_count[%d] = %d,
     // faulting va = %p\n",
     //        PGIDX(faulting_pa),
     //        get_ref_count(faulting_pa), faulting_va);
-    acquire(&ref_count.lock);
-
+    
     char *mem;
     if ((mem = kalloc()) == 0) {
       // no memory available, kill the process
