@@ -98,6 +98,8 @@ I suppose that it is because under concurrent situation, `kfree()` may read a no
 
 <del>I tried some schemes, but they may cause problems in the normal cases.</del>
 
+Always acquire `ref_count.lock` before reading and writing to `ref_count` and release the lock until a block of operations are done.
+
 #### [FIXED] Panic When Memory Is Out
 
 **THE BUG IS FIXED, SEE [THE _SOLUTION_ PART](#solution-3)!**
