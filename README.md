@@ -11,7 +11,7 @@
 
 Both of the two bugs are related to the page freeing problems. 
 
-#### Free Page In ==CONCURRENCY== Situation
+#### Free Page In CONCURRENCY Situation
 
 ##### Description
 
@@ -60,6 +60,6 @@ panic: kerneltrap
 
 #### Assumption
 
-I can see that it is first caused by ==page fault== by the instruction at `0x000000008000026c`, which want to access `0x0000000000000000`. 
+I can see that it is first caused by page fault by the instruction at `0x000000008000026c`, which want to access `0x0000000000000000`. 
 
 The other outputs are not important since the first line has ruined the sanity of memory. 

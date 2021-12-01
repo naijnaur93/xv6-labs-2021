@@ -116,8 +116,8 @@ usertrap(void)
              get_ref_count(faulting_pa) == 0) {
     // abnormal case, give debug output
 
-    // printf("[ERROR] encountered a zero-referred page, ref_count[%d] = 0\n",
-    //        (faulting_pa - KERNBASE) / PGSIZE);
+    printf("[ERROR] encountered a zero-referred page, ref_count[%d] = 0\n",
+           (faulting_pa - KERNBASE) / PGSIZE);
     pte_t *faulting_pte;
     if ((faulting_pte = walk(p->pagetable, faulting_va, 0)) != 0) {
       // unset the COW bit, give write permission
