@@ -43,7 +43,7 @@ It will automatically run all test cases and finally give out my scores.
 
 *(subject to update because it's currently under progress)*
 
-**Progress: 5 / 10**
+**Progress: 6 / 10**
 
 ## Lab 1 - Unix Utilities
 
@@ -151,6 +151,28 @@ $ git checkout cow
 
 **See the report in the branch `cow`**
 
+## Lab 6 - Multi-Threading
+
+The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/2021/labs/thread.html).
+
+### Tasks
+
+- `Uthread`: Design the context switch mechanism for a user-level threading system, and then implement it.
+- `Using threads`: Explore parallel programming with threads and locks using a hash table.
+- Implement a [barrier](http://en.wikipedia.org/wiki/Barrier_(computer_science)): a point in an application at which all participating threads must wait until all other participating threads reach that point too. Use `pthread` condition variables, which are a sequence coordination technique similar to `xv6`'s sleep and wakeup.
+
+### Detailed Reports
+
+**REMINDER: PLEASE SWITCH TO THE CORRECT BRANCH BY:**
+
+```
+$ git checkout thread
+```
+
+**See the report in the branch `thread`**
+
+
+
 # Test Results
 
 ## Lab 1
@@ -175,3 +197,6 @@ $ git checkout cow
 
 ![image-20211201180803327](README.assets/image-20211201180803327.png)
 
+## Lab 6
+
+![image-20211205133907251](README.assets/image-20211205133907251.png)
