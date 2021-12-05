@@ -1,0 +1,77 @@
+Question In Task 2 : Why are there missing keys with 2 threads, but not with 1 thread? Identify a sequence of events with 2 threads that can lead to a key being missing. 
+
+Ans: 
+
+  For example, assume that there are 2 threads.
+
+  According to the code:
+
+  ```c
+  put_thread(void *xa)
+  {
+  int n = (int) (long) xa; // thread number
+  int b = NKEYS/nthread;   // in this situation, b = 5000
+
+    for (int i = 0; i < b; i++) {
+      put(keys[b*n + i], n);
+    }
+
+  return NULL;
+  }
+  ```
+
+  Also assume that in the first round (i.e. `i == 0`), `thread 0` wants to put `keys[0] = 5` into the hash table, while `thread 1` wants to put `keys[5000] = 10` into the hash table. They call `put()` almost at the same time.
+
+In the function `put()`:
+
+```c
+static
+void put(int key, int value)
+{
+  int i = key % NBUCKET;
+
+  // is the key already present?
+  struct entry *e = 0;
+  for (e = table[i]; e != 0; e = e->next) {
+    if (e->key == key)
+      break;
+  }
+  if(e){
+    // update the existing key.
+    e->value = value;
+  } else {
+    // the new is new.
+    insert(key, value, &table[i], table[i]);
+  }
+```
+
+We assume that the hash table is empty now. Both threads will hash their keys into `0`, so they all want to insert a key value pair into `table[0]`.
+
+Assume `thread 0` goes first. At `line 17`, when it is about to insert `{5, 0}` into `table[0]`, it is switched to the `thread 1`. 
+
+Now `thread 1` also want to insert `{10, 1}` into `table[0]`, so it looks at the `table[0]` and find it empty. Again at `line 17`, when `thread 1` is about to insert `{10, 1}` into `table[0]`, it is switched back to `thread 0`.
+
+`thread 0` continues inserting `{5, 0}`. Look at the code `insert()`:
+
+```c
+static void 
+insert(int key, int value, struct entry **p, struct entry *n)
+{
+  struct entry *e = malloc(sizeof(struct entry));
+  e->key = key;
+  e->value = value;
+  e->next = n;
+  *p = e;
+}
+```
+
+Assume when `e->next = n;` at `line 7` got executed, it got switched to `thread 1`. 
+
+Now the `e` in `thread 0` is `e = {key = 5, value = 0, next = NULL}`, while `table[0] = NULL`.
+
+Assume `thread 1` executed all of the instructions before it is switched to `thread 0`. Therefore, when `thread 0` continue to execute, `table[0]` points to `e = {key = 10, value = 1, next = NULL}` in `thread 1`.
+
+`thread 0` completes its insertion, but now `table[0]` points to `e = {key = 5, value = 0, next = NULL}`, the `e` in `thread 0`.
+
+Therefore, we can see that the key-value pair created by `thread 1` got lost.
+
