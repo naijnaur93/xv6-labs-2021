@@ -43,7 +43,7 @@ It will automatically run all test cases and finally give out my scores.
 
 *(subject to update because it's currently under progress)*
 
-**Progress: 6 / 10**
+**Progress: 7 / 10**
 
 ## Lab 1 - Unix Utilities
 
@@ -171,7 +171,29 @@ $ git checkout thread
 
 **See the report in the branch `thread`**
 
+## Lab 7 - Networking
 
+The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/2021/labs/net.html).
+
+### Task
+
+Your job is to complete `e1000_transmit()` and `e1000_recv()`, both in `kernel/e1000.c`, so that the driver can transmit and receive packets. You are done when `make grade` says your solution passes all the tests.
+
+### Pit Falls
+
+- Every time `e1000_recv()` is called, there could be multiple packages waiting to be read. 
+  If not all of these packages are processed, then the program will just sleep forever, while the switcher cannot find any `RUNNABLE` thread to execute.
+- `net_rx()`, which is called in `e1000_recv()`, will finally call `e1000_transmit()`. Since we need to add lock for both `e1000_transmit()` and `e1000_recv()`, it's impossible to just add a lock through out the functions. 
+
+### Code
+
+**PLEASE SWITCH TO THE CORRECT BRANCH BY:**
+
+```
+$ git checkout net
+```
+
+**No detailed report provided because the hints in the lab specification are lucid enough.**
 
 # Test Results
 
@@ -200,3 +222,7 @@ $ git checkout thread
 ## Lab 6
 
 ![image-20211205133907251](README.assets/image-20211205133907251.png)
+
+## Lab 7
+
+![image-20211213090416679](README.assets/image-20211213090416679.png)
