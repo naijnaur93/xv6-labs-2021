@@ -103,7 +103,7 @@ e1000_transmit(struct mbuf *m)
   // a pointer so that it can be freed after sending.
   //
 
-
+  acquire(&e1000_lock);
   static struct mbuf *last_mbuf;
   if (tx_ring[(uint16)(regs[E1000_TDT] % TX_RING_SIZE)].status != E1000_TXD_STAT_DD) {
     printf("e1000_transmit(), the previous transmission has not been done yet");
@@ -123,7 +123,7 @@ e1000_transmit(struct mbuf *m)
   last_mbuf = m;
   // update the ring position
   regs[E1000_TDT] = (regs[E1000_TDT] + 1) % TX_RING_SIZE;
-
+  release(&e1000_lock);
 
   return 0;
 }
@@ -137,17 +137,26 @@ e1000_recv(void)
   // Check for packets that have arrived from the e1000
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
+
+  static struct mbuf *tmp;
   uint16 rcv_idx = ((uint16)regs[E1000_RDT] + 1) % RX_RING_SIZE;
   // check if a new packet is available
-  if (rx_ring[rcv_idx].status & E1000_RXD_STAT_DD) {
-    rx_mbufs[rcv_idx]->len = rx_ring[rcv_idx].length;
-    net_rx(rx_mbufs[rcv_idx]);
+  // NOTE: THERE COULD BE MORE THAN ONE PACKEGE!!!
+  while (rx_ring[rcv_idx].status & E1000_RXD_STAT_DD) {
+    acquire(&e1000_lock);
 
-    rx_mbufs[rcv_idx] = kalloc();
-    rx_mbufs[rcv_idx]->head = (char *)(rx_ring[rcv_idx].addr);
+    rx_mbufs[rcv_idx]->len = rx_ring[rcv_idx].length;
+    tmp = rx_mbufs[rcv_idx];
+
+    rx_mbufs[rcv_idx] = mbufalloc(0);
+    rx_ring[rcv_idx].addr = (uint64)rx_mbufs[rcv_idx]->head;
     rx_ring[rcv_idx].status = 0;
 
-    regs[E1000_RDT] = ((uint16)(regs[E1000_RDT]) + 1) % RX_RING_SIZE;
+    regs[E1000_RDT] = rcv_idx;
+    rcv_idx = (rcv_idx + 1) % RX_RING_SIZE;
+
+    release(&e1000_lock);
+    net_rx(tmp);
   }
 }
 
