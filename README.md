@@ -195,6 +195,25 @@ $ git checkout net
 
 **No detailed report provided because the hints in the lab specification are lucid enough.**
 
+## Lab 8 - Lock
+
+The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/2021/labs/lock.html).
+
+### Tasks
+
+- To implement per-CPU freelists, and stealing when a CPU's free list is empty, so that lock contentions can be reduced.
+- Modify the block cache so that the number of `acquire` loop iterations for all locks in the bcache is close to zero when running `bcachetest`. Use hash table to minimize lock contention on `bcache.lock`.
+
+### Detailed Report
+
+**PLEASE SWITCH TO THE CORRECT BRANCH BY:**
+
+```
+$ git checkout lock
+```
+
+**See the report in the branch `lock`**
+
 # Test Results
 
 ## Lab 1
@@ -226,3 +245,14 @@ $ git checkout net
 ## Lab 7
 
 ![image-20211213090416679](README.assets/image-20211213090416679.png)
+
+## Lab 8
+
+**NOTE: THERE ARE SOME BUGS IN THE ORIGINAL CODE. I STILL PASSED ALL TESTS IF `usertests` RUNS IN A CLEAN FILE SYSTEM**
+
+**IF YOU HAVE QUESTIONS, SEE DETAILED REPORT**
+
+![image-20211215150827436](README.assets/image-20211215150827436.png)
+
+
+
