@@ -87,21 +87,27 @@ kalloc(void)
     kmem[cpuid()].freelist = r->next;
   } else {
     // steal memory from other CPUs
+    // acquire its own memory lock to avoid potential loss of free page
+    acquire(&kmem[cpuid()].lock);
     int i;
     for (i = 0; i < NCPU; i++) {
-      acquire(&kmem[i].lock);
-      r = kmem[i].freelist;
-      if (r) {  // available memory found
-        kmem[i].freelist = r->next;
-        release(&kmem[i].lock);
-        break;
+      if (i != cpuid()) {
+        acquire(&kmem[i].lock);
+        r = kmem[i].freelist;
+        if (r) {  // available memory found
+          kmem[i].freelist = r->next;
+          release(&kmem[i].lock);
+          release(&kmem[cpuid()].lock);
+          break;
       }
       release(&kmem[i].lock);
+      }
     }
   }
+  // remember to release `kmem[cpuid()].lock` if there's no memory can be stolen
+  if (holding(&kmem[cpuid()].lock)) release(&kmem[cpuid()].lock);
   pop_off();
 
-  if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
-  return (void*)r;
+  if (r) memset((char *)r, 5, PGSIZE);  // fill with junk
+  return (void *)r;
 }

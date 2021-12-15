@@ -107,6 +107,7 @@ bget(uint dev, uint blockno)
   int i;
   for (i = 0; i < HASHSZ; i++) {
     if (i != bckt_idx) {
+      acquire(&bcache.table[i].lk);
       // printf("current bucket %d, search in bucket %d\n", bckt_idx, i);
       for (b = bcache.table[i].head.prev; b != &bcache.table[i].head;
            b = b->prev) {
@@ -125,12 +126,14 @@ bget(uint dev, uint blockno)
           bcache.table[bckt_idx].head.next->prev = b;
           bcache.table[bckt_idx].head.next = b;
 
+          release(&bcache.table[i].lk);
           release(&bcache.table[bckt_idx].lk);
           release(&bcache.lock);
           acquiresleep(&b->lock);
           return b;
         }
       }
+      release(&bcache.table[i].lk);
     }
   }
   panic("bget: no buffers");
