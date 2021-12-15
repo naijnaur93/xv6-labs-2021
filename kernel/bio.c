@@ -23,6 +23,13 @@
 #include "fs.h"
 #include "buf.h"
 
+#define HASHSZ 13
+
+struct bucket {
+  struct buf head;
+  struct spinlock lk;
+};
+
 struct {
   struct spinlock lock;
   struct buf buf[NBUF];
@@ -30,7 +37,7 @@ struct {
   // Linked list of all buffers, through prev/next.
   // Sorted by how recently the buffer was used.
   // head.next is most recent, head.prev is least.
-  struct buf head;
+  struct bucket table[HASHSZ];
 } bcache;
 
 void
@@ -41,14 +48,18 @@ binit(void)
   initlock(&bcache.lock, "bcache");
 
   // Create linked list of buffers
-  bcache.head.prev = &bcache.head;
-  bcache.head.next = &bcache.head;
+  int i;
+  for (i = 0; i < HASHSZ; i++) {
+    initlock(&bcache.table[i].lk, "bucket");
+    bcache.table[i].head.prev = &bcache.table[i].head;
+    bcache.table[i].head.next = &bcache.table[i].head;
+  }
   for(b = bcache.buf; b < bcache.buf+NBUF; b++){
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
+    b->next = bcache.table[0].head.next;
+    b->prev = &bcache.table[0].head;
     initsleeplock(&b->lock, "buffer");
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
+    bcache.table[0].head.next->prev = b;
+    bcache.table[0].head.next = b;
   }
 }
 
@@ -59,30 +70,65 @@ static struct buf*
 bget(uint dev, uint blockno)
 {
   struct buf *b;
+  int bckt_idx = blockno % HASHSZ;
 
   acquire(&bcache.lock);
 
+  // printf("bget(blockno = %d), hash to bucket %d\n", blockno, bckt_idx);
   // Is the block already cached?
-  for(b = bcache.head.next; b != &bcache.head; b = b->next){
+  for(b = bcache.table[bckt_idx].head.next; b != &bcache.table[bckt_idx].head; b = b->next){
     if(b->dev == dev && b->blockno == blockno){
       b->refcnt++;
+      // printf("find CACHED blockno %d in table[%d]\n", blockno, bckt_idx);
+      release(&bcache.lock);
+      acquiresleep(&b->lock);
+      return b;
+    }
+  }
+  // printf("block %d not cached, find free block in the bucket %d\n", blockno,
+  //        bckt_idx);
+  // Not cached.
+  // Recycle the least recently used (LRU) unused buffer.
+  for(b = bcache.table[bckt_idx].head.prev; b != &bcache.table[bckt_idx].head; b = b->prev){
+    if(b->refcnt == 0) {
+      b->dev = dev;
+      b->blockno = blockno;
+      b->valid = 0;
+      b->refcnt = 1;
+      // printf("find FREE blockno %d in table[%d]\n", blockno, bckt_idx);
       release(&bcache.lock);
       acquiresleep(&b->lock);
       return b;
     }
   }
 
-  // Not cached.
-  // Recycle the least recently used (LRU) unused buffer.
-  for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
-    if(b->refcnt == 0) {
-      b->dev = dev;
-      b->blockno = blockno;
-      b->valid = 0;
-      b->refcnt = 1;
-      release(&bcache.lock);
-      acquiresleep(&b->lock);
-      return b;
+  // steal from other buckets
+  int i;
+  for (i = 0; i < HASHSZ; i++) {
+    if (i != bckt_idx) {
+      // printf("current bucket %d, search in bucket %d\n", bckt_idx, i);
+      for (b = bcache.table[i].head.prev; b != &bcache.table[i].head;
+           b = b->prev) {
+        if (b->refcnt == 0) {
+          b->dev = dev;
+          b->blockno = blockno;
+          b->valid = 0;
+          b->refcnt = 1;
+          // printf("find FREE blockno %d in table[%d]\n", blockno, bckt_idx);
+          // remove b from its original bucket
+          b->next->prev = b->prev;
+          b->prev->next = b->next;
+          // add b to the head of the current bucket
+          b->next = bcache.table[bckt_idx].head.next;
+          b->prev = &bcache.table[bckt_idx].head;
+          bcache.table[bckt_idx].head.next->prev = b;
+          bcache.table[bckt_idx].head.next = b;
+
+          release(&bcache.lock);
+          acquiresleep(&b->lock);
+          return b;
+        }
+      }
     }
   }
   panic("bget: no buffers");
@@ -123,16 +169,17 @@ brelse(struct buf *b)
 
   acquire(&bcache.lock);
   b->refcnt--;
+  int hash_idx = b->blockno % HASHSZ;
   if (b->refcnt == 0) {
     // no one is waiting for it.
     b->next->prev = b->prev;
     b->prev->next = b->next;
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
+    b->next = bcache.table[hash_idx].head.next;
+    b->prev = &bcache.table[hash_idx].head;
+    bcache.table[hash_idx].head.next->prev = b;
+    bcache.table[hash_idx].head.next = b;
   }
-  
+
   release(&bcache.lock);
 }
 
