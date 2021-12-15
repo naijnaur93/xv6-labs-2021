@@ -72,7 +72,7 @@ bget(uint dev, uint blockno)
   struct buf *b;
   int bckt_idx = blockno % HASHSZ;
 
-  acquire(&bcache.lock);
+  acquire(&bcache.table[bckt_idx].lk);
 
   // printf("bget(blockno = %d), hash to bucket %d\n", blockno, bckt_idx);
   // Is the block already cached?
@@ -80,7 +80,7 @@ bget(uint dev, uint blockno)
     if(b->dev == dev && b->blockno == blockno){
       b->refcnt++;
       // printf("find CACHED blockno %d in table[%d]\n", blockno, bckt_idx);
-      release(&bcache.lock);
+      release(&bcache.table[bckt_idx].lk);
       acquiresleep(&b->lock);
       return b;
     }
@@ -91,18 +91,19 @@ bget(uint dev, uint blockno)
   // Recycle the least recently used (LRU) unused buffer.
   for(b = bcache.table[bckt_idx].head.prev; b != &bcache.table[bckt_idx].head; b = b->prev){
     if(b->refcnt == 0) {
-      b->dev = dev;
       b->blockno = blockno;
+      b->dev = dev;
       b->valid = 0;
       b->refcnt = 1;
       // printf("find FREE blockno %d in table[%d]\n", blockno, bckt_idx);
-      release(&bcache.lock);
+      release(&bcache.table[bckt_idx].lk);
       acquiresleep(&b->lock);
       return b;
     }
   }
 
   // steal from other buckets
+  acquire(&bcache.lock);
   int i;
   for (i = 0; i < HASHSZ; i++) {
     if (i != bckt_idx) {
@@ -124,6 +125,7 @@ bget(uint dev, uint blockno)
           bcache.table[bckt_idx].head.next->prev = b;
           bcache.table[bckt_idx].head.next = b;
 
+          release(&bcache.table[bckt_idx].lk);
           release(&bcache.lock);
           acquiresleep(&b->lock);
           return b;
@@ -165,11 +167,11 @@ brelse(struct buf *b)
   if(!holdingsleep(&b->lock))
     panic("brelse");
 
+  int hash_idx = b->blockno % HASHSZ;
   releasesleep(&b->lock);
 
-  acquire(&bcache.lock);
+  acquire(&bcache.table[hash_idx].lk);
   b->refcnt--;
-  int hash_idx = b->blockno % HASHSZ;
   if (b->refcnt == 0) {
     // no one is waiting for it.
     b->next->prev = b->prev;
@@ -180,7 +182,7 @@ brelse(struct buf *b)
     bcache.table[hash_idx].head.next = b;
   }
 
-  release(&bcache.lock);
+  release(&bcache.table[hash_idx].lk);
 }
 
 void
