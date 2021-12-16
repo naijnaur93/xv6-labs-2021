@@ -82,13 +82,13 @@ kalloc(void)
   struct run *r;
 
   push_off();
+  acquire(&kmem[cpuid()].lock);
   r = kmem[cpuid()].freelist;
   if(r) {
     kmem[cpuid()].freelist = r->next;
   } else {
     // steal memory from other CPUs
     // acquire its own memory lock to avoid potential loss of free page
-    acquire(&kmem[cpuid()].lock);
     int i;
     for (i = 0; i < NCPU; i++) {
       if (i != cpuid()) {

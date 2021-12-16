@@ -76,14 +76,14 @@ To see my implementation, please check [`kernel/kalloc.c`](kernel/kalloc.c). I m
 
 #### Pit Falls
 
-1. **YOU HAVE TO ACQUIRE BOTH LOCKS IN THE CURRENT CPU AND ANOTHER CPU WHICH YOU WANT TO STEAL MEMORY FROM. OTHERWISE YOU WILL SUFFER LOSS OF FREE PAGES.**
+1. **YOU HAVE TO ACQUIRE BOTH LOCKS IN THE CURRENT CPU AND ANOTHER CPU WHICH YOU WANT TO STEAL MEMORY FROM. OTHERWISE YOU WILL SUFFER LOSS OF FREE PAGES.** For example, if CPU 1 is allocating its free list, while CPU 2 wants to steal a block of free memory from CPU 1, and accidentally both of the CPUs obtained the same block of memory. In another case, if CPU 1 wants to steal memory from CPU 2, at the same time CPU 2 wants to steal memory from CPU 1. These cases all potentially cause problems.
 2. **BESIDES, IF NO MEMORY FOUND IN ANOTHER CPU, REMEMBER TO RELEASE THE LOCK OF CURRENT CPU. OTHERWISE YOU WILL SUFFER `panic: sched lock`**
 
 ## Task 2 - Buffer Cache
 
 ### Specification
 
-Modify the block cache so that the number of `acquire` loop iterations for all locks in the bcache is close to zero when running `bcachetest`.
+Modify the block cache so that the number of `acquire` loop iterations for all locks in the `bcache` is close to zero when running `bcachetest`.
 
 Modify `bget` and `brelse` so that concurrent lookups and releases for different blocks that are in the `bcache` are unlikely to conflict on locks (e.g., don't all have to wait for `bcache.lock`). 
 
