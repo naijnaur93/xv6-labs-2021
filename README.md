@@ -76,7 +76,7 @@ It will automatically run all test cases and finally give out my scores.
 
 *(subject to update because it's currently under progress)*
 
-**Progress: 8 / 10**
+**Progress: 9 / 10**
 
 ## Lab 1 - Unix Utilities
 
