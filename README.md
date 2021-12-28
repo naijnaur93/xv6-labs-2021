@@ -15,6 +15,39 @@ $ sudo apt-get update && sudo apt-get upgrade
 $ sudo apt-get install git build-essential gdb-multiarch qemu-system-misc gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu
 ```
 
+### Installing on macOS
+
+First, install developer tools:
+
+```
+$ xcode-select --install
+```
+
+Next, install [Homebrew](https://brew.sh/), a package manager for macOS:
+
+```
+$ /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+```
+
+Next, install the [RISC-V compiler toolchain](https://github.com/riscv/homebrew-riscv):
+
+```
+$ brew tap riscv/riscv
+$ brew install riscv-tools
+```
+
+The brew formula may not link into `/usr/local`. You will need to update your shell's rc file (e.g. [~/.bashrc](https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html)) to add the appropriate directory to [$PATH](http://www.linfo.org/path_env_var.html).
+
+```
+PATH=$PATH:/usr/local/opt/riscv-gnu-toolchain/bin
+```
+
+Finally, install QEMU:
+
+```
+brew install qemu
+```
+
 ### For Other Systems
 
 **Please refer to [instructions on the course website](https://pdos.csail.mit.edu/6.S081/2021/tools.html).**
