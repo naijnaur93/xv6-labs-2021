@@ -22,7 +22,6 @@ struct inode {
   int valid;          // inode has been read from disk?
 
   short type;         // copy of disk inode
-  char target[MAXPATH];
   short major;
   short minor;
   short nlink;

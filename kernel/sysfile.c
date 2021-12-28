@@ -330,6 +330,34 @@ sys_open(void)
     end_op();
     return -1;
   }
+  if (ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)) {
+    // we should follow the symbolic link
+    int cnt = 0;
+    char target[MAXPATH];
+    readi(ip, 0, (uint64)target, 0, MAXPATH);
+    iunlockput(ip);
+    // follow the symbolic link file until reaching a non-link file
+    while ((ip = namei(target)) != 0) {
+      ilock(ip);
+      if (ip->type != T_SYMLINK) {
+        break;
+      }
+      if (cnt++ >= 10) {
+        // Possibly the sym links form a cycle
+        // abort the transaction
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      readi(ip, 0, (uint64)target, 0, MAXPATH);
+      iunlockput(ip);
+    }
+    if (ip == 0) {
+      // Did not find `ip` according to `target` path
+      end_op();
+      return -1;
+    }
+  }  // otherwise open the file itself
 
   // Try allocating a struct file in memory to represent the file
   // Then try allocating a corresponding file descriptor
@@ -505,13 +533,39 @@ uint64 sys_symlink(void) {
   if (argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0) return -1;
 
   begin_op();  // start a transaction
-  if ((ip = namei(target)) == 0) {
+  int cnt = 0;
+  // follow the symbolic link file until reaching a non-link file
+  while ((ip = namei(target)) != 0) {
+    ilock(ip);
+    if (ip->type != T_SYMLINK) {
+      break;
+    }
+    if (cnt++ >= 10) {
+      // Possibly the sym links form a cycle
+      // abort the transaction
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+    readi(ip, 0, (uint64)target, 0, MAXPATH);
+    iunlockput(ip);
+  }
+  if (ip == 0) {
     // Did not find `ip` according to `target` path
+    // skip operations on `ip`, blindly write `target` path to the symlink file
+    // there shouldn't be any file at `path`
+    if ((dp = namei(path)) != 0) goto bad;
+    // create a symlink file, create() will automatically
+    // add the entry to its parent directory
+    dp = create(path, T_SYMLINK, 0, 0);
+    writei(dp, 0, (uint64)target, 0, MAXPATH);
+    // update `dp` to disk
+    iunlockput(dp);
     end_op();
-    return -1;
+    return 0;
   }
 
-  ilock(ip);
+  // Here `ip` is already locked
   if (ip->type == T_DIR) {
     // the inode to be linked is a directory, abort the operation
     iunlockput(ip);
@@ -529,7 +583,7 @@ uint64 sys_symlink(void) {
   // create a symlink file, create() will automatically
   // add the entry to its parent directory
   dp = create(path, T_SYMLINK, 0, 0);
-  memmove(dp->target, target, MAXPATH);
+  writei(dp, 0, (uint64)target, 0, MAXPATH);
   // update `dp` to disk
   iunlockput(dp);
   // update `ip` to disk
