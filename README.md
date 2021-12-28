@@ -214,6 +214,25 @@ $ git checkout lock
 
 **See the report in the branch `lock`**
 
+## Lab 9 - File System
+
+Here is [the original requirement](https://pdos.csail.mit.edu/6.S081/2021/labs/fs.html).
+
+### Tasks
+
+- Increase the maximum size of an xv6 file from $12+256=268 \ blocks$ to $(11+256+256^2) blocks$
+- Implement the `symlink(char *target, char *path)` system call, which creates a new symbolic link at path that refers to file named by `target`.
+
+### Detailed Report
+
+**PLEASE SWITCH TO THE CORRECT BRANCH BY:**
+
+```
+$ git checkout fs
+```
+
+**See the report in the branch `fs`**
+
 # Test Results
 
 ## Lab 1
@@ -254,5 +273,8 @@ $ git checkout lock
 
 ![image-20211215192940944](README.assets/image-20211215192940944.png)
 
+## Lab 9
 
+**Note**: *The `usertests` is __EVEN MORE TIME-CONSUMING__. If your computer has a weak performance, the `usertests` may fail because of time out.*
 
+![image-20211228210129777](README.assets/image-20211228210129777.png)
