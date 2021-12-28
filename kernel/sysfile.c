@@ -122,34 +122,42 @@ sys_link(void)
   char name[DIRSIZ], new[MAXPATH], old[MAXPATH];
   struct inode *dp, *ip;
 
+  // get the address of `old` and `new`
   if(argstr(0, old, MAXPATH) < 0 || argstr(1, new, MAXPATH) < 0)
     return -1;
 
-  begin_op();
+  begin_op();  // start a transaction
   if((ip = namei(old)) == 0){
+    // Did not find `ip` according to `old` path
     end_op();
     return -1;
   }
 
   ilock(ip);
   if(ip->type == T_DIR){
+    // the inode to be linked is a directory, abort the operation
     iunlockput(ip);
     end_op();
     return -1;
   }
 
+  // update the inode's info
   ip->nlink++;
   iupdate(ip);
   iunlock(ip);
 
+  // find the parent directory `dp` of the file name in `new` path
   if((dp = nameiparent(new, name)) == 0)
     goto bad;
   ilock(dp);
+  // write a new entry `name` to `ip` in `dp` 
   if(dp->dev != ip->dev || dirlink(dp, name, ip->inum) < 0){
     iunlockput(dp);
     goto bad;
   }
+  // update `dp` to disk
   iunlockput(dp);
+  // update `ip` to disk
   iput(ip);
 
   end_op();
@@ -297,14 +305,15 @@ sys_open(void)
 
   begin_op();
 
-  if(omode & O_CREATE){
+  if(omode & O_CREATE){  // create the file if it did not exist
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
       return -1;
     }
-  } else {
+  } else {  // just open the named file
     if((ip = namei(path)) == 0){
+      // the named file did not exist, fail to open
       end_op();
       return -1;
     }
@@ -322,6 +331,8 @@ sys_open(void)
     return -1;
   }
 
+  // Try allocating a struct file in memory to represent the file
+  // Then try allocating a corresponding file descriptor
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
@@ -485,4 +496,54 @@ sys_pipe(void)
   return 0;
 }
 
-uint64 sys_symlink(void) { return 0; }
+uint64 sys_symlink(void) {
+  // create symbolic link at `path` that refers to `target`
+  char target[MAXPATH], path[MAXPATH];
+  struct inode *dp, *ip;
+
+  // get the address of `old` and `new`
+  if (argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0) return -1;
+
+  begin_op();  // start a transaction
+  if ((ip = namei(target)) == 0) {
+    // Did not find `ip` according to `target` path
+    end_op();
+    return -1;
+  }
+
+  ilock(ip);
+  if (ip->type == T_DIR) {
+    // the inode to be linked is a directory, abort the operation
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  // update the inode's info
+  ip->nlink++;
+  iupdate(ip);
+  iunlock(ip);
+
+  // there shouldn't be any file at `path`
+  if ((dp = namei(path)) != 0) goto bad;
+  // create a symlink file, create() will automatically
+  // add the entry to its parent directory
+  dp = create(path, T_SYMLINK, 0, 0);
+  memmove(dp->target, target, MAXPATH);
+  // update `dp` to disk
+  iunlockput(dp);
+  // update `ip` to disk
+  iput(ip);
+
+  end_op();
+
+  return 0;
+
+bad:
+  ilock(ip);
+  ip->nlink--;
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+  return -1;
+}
