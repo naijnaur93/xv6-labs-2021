@@ -4,18 +4,53 @@ This is a **portal** for my project of [MIT 6.S081(Operating System), 2021 Fall]
 
 You can get a glance at what I've done in this project. To further inspect/test my code, please switch branches and see instructions below.
 
+# Automatic Testing (`Ubuntu/Debian` ONLY)
+
+### 1. Setup Build Environment
+
+Run the script to set up your building environment:
+
+```
+$ sudo ./build.sh
+```
+
+### 2. Run Tests
+
+If you just run:
+
+```
+$ bash test.sh
+```
+
+Or
+
+```
+$ chmod 755 test.sh
+$ ./test.sh
+```
+
+Then **ALL** labs' tests will be executed, which estimated for **TWENTY MINUTES!!!**
+
+
+
+You can also specify which test(s) you want to execute, just append the lab's name:
+
+```
+$ ./test.sh util syscall pgtbl
+```
+
 # Build Instructions
 
 **BEFORE BUILDING AND TESTING MY CODE, MAKE SURE THAT YOU HAVE SET UP BUILDING ENVIRONMENT!!!**
 
-### For Debian Or Ubuntu
+### For `Debian` Or `Ubuntu`
 
 ```
 $ sudo apt-get update && sudo apt-get upgrade
 $ sudo apt-get install git build-essential gdb-multiarch qemu-system-misc gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu
 ```
 
-### Installing on macOS
+### Installing on `macOS`
 
 First, install developer tools:
 
@@ -42,7 +77,7 @@ The brew formula may not link into `/usr/local`. You will need to update your sh
 PATH=$PATH:/usr/local/opt/riscv-gnu-toolchain/bin
 ```
 
-Finally, install QEMU:
+Finally, install `QEMU`:
 
 ```
 brew install qemu
@@ -54,7 +89,7 @@ brew install qemu
 
 # Test Instructions
 
-The test can ONLY be done one by one. 
+<del>The test can ONLY be done one by one. </del>
 
 To inspect my code, **first switch to the branch you wish.** For example, if you want to see my implementation of `Lab Util`, first type:
 
