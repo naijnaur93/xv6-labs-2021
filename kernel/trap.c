@@ -11,6 +11,17 @@ uint ticks;
 
 extern char trampoline[], uservec[], userret[];
 
+struct file {
+  enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
+  int ref;  // reference count
+  char readable;
+  char writable;
+  struct pipe *pipe;  // FD_PIPE
+  struct inode *ip;   // FD_INODE and FD_DEVICE
+  uint off;           // FD_INODE
+  short major;        // FD_DEVICE
+};
+
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
 
@@ -67,7 +78,40 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (r_scause() == 13) {
+    // page fault
+    uint64 va = r_stval();
+    pte_t *pte = walk(p->pagetable, va, 0);
+    if (*pte == 0) {
+      printf("the vma %p is not mapped!\n", va);
+      goto unexpected;
+    }
+    if (*pte & PTE_M) {
+      // it's a vma.
+      va = PGROUNDUP(va);
+      // look up vmas to find the relevant file
+      int i = 0;
+      for (; i < MAXVMA; i++) {
+        if (p->vmas[i].addr + p->vmas[i].length >= PGROUNDUP(va)) break;
+      }
+      if (i == MAXVMA) {
+        printf("Did not find the vma %p in proc\n", va);
+        goto unexpected;
+      }
+      // allocate a physical memory
+      char *new_mem = kalloc();
+      memset(new_mem, 0, PGSIZE);
+      // read in 4096 bytes from the relevant file
+      ilock(p->vmas[i].f->ip);
+      readi(p->vmas[i].f->ip, 0, (uint64)new_mem, p->vmas[i].off, PGSIZE);
+      p->vmas[i].off += PGSIZE;
+      iunlock(p->vmas[i].f->ip);
+      // map the physical mem to user space
+      mappages(p->pagetable, va, PGSIZE, (uint64)new_mem,
+               PTE_M | PTE_R | PTE_U | PTE_W);
+    }
   } else {
+    unexpected:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
