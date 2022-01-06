@@ -96,6 +96,43 @@ sys_uptime(void)
   return xticks;
 }
 
-uint64 sys_mmap(void) { return 0xffffffffffffffff; }
+uint64 sys_mmap(void) {
+  uint64 addr, length, offset;
+  int flags, prot, fd;
+  int i;
+  struct proc *p = myproc();
+
+  if (argaddr(0, &addr) < 0 || argaddr(1, &length) < 0 || argint(2, &prot) < 0 ||
+      argint(3, &flags) < 0 || argint(4, &fd) < 0 || argaddr(5, &offset) < 0) {
+    panic("mmap(), fail to retrieve some arguments!");
+  }
+  // allocate a vma for the mmap
+  for (i = 0; i < MAXVMA; i++) {
+    if (p->vmas[i].f == 0) {
+      // the vma is available
+      break;
+    }
+  }
+  if (i == MAXVMA) return 0xffffffffffffffff;  // no free vma
+  if (addr == 0) {
+    // find an unused memory range to map the file
+    addr = PGROUNDUP(p->sz);
+  }
+  p->sz = addr + PGROUNDUP(length);
+  // fill out the vma info
+  p->vmas[i].addr = addr;
+  p->vmas[i].flags = flags;
+  p->vmas[i].length = length;
+  p->vmas[i].off = offset;
+  p->vmas[i].prot = prot;
+  p->vmas[i].f = p->ofile[fd];
+
+  // map these vma pages. Since we apply lazy alloc, now pa is not available
+  if (mappages(p->pagetable, addr, length, 0, PTE_M) < 0)
+    return 0xffffffffffffffff;
+  // increase the file's ref count
+  filedup(p->vmas[i].f);
+  return addr;
+}
 
 uint64 sys_munmap(void) { return -1; }
