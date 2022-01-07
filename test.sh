@@ -27,6 +27,7 @@ if [ -z "$1" ]; then
 		grade "net"
 		grade "lock"
 		grade "fs"
+                grade "mmap"
 	else
 		echo "Operation Cancelled"
 		exit
@@ -34,7 +35,7 @@ if [ -z "$1" ]; then
 fi
 
 while [ -n "$1" ]; do
-	if [[ $1 =~ ^(util|syscall|pgtbl|traps|cow|thread|net|lock|fs)$ ]]; then
+	if [[ $1 =~ ^(util|syscall|pgtbl|traps|cow|thread|net|lock|fs|mmap)$ ]]; then
 		grade $1
 	else
 		echo "EOORO: Unknown lab name: $1"
@@ -49,6 +50,7 @@ while [ -n "$1" ]; do
 		echo net
 		echo lock
 		echo fs
+                echo mmap
 	fi
 	shift
 done

@@ -109,10 +109,6 @@ It will automatically run all test cases and finally give out my scores.
 
 # Project Overview
 
-*(subject to update because it's currently under progress)*
-
-**Progress: 9 / 10**
-
 ## Lab 1 - Unix Utilities
 
 The original requirements can be found [here](https://pdos.csail.mit.edu/6.S081/2021/labs/util.html).
@@ -301,6 +297,28 @@ $ git checkout fs
 
 **See the report in the branch `fs`**
 
+## Lab 10 - mmap
+
+Here is [the original requirement](https://pdos.csail.mit.edu/6.S081/2021/labs/mmap.html).
+
+### Tasks
+
+Implement enough `mmap` and `munmap` functionality, including:
+
+- `mmap` a file to a virtual area which is allocated by the OS applying the lazy allocation. Support setting `PROT`(`PROT_READ, PROT_WRITE, PROT_EXEC`), `flags`(`MAP_SHARED, MAP_PRIVATE`), offset and length. When the mmap-ed page is accessed, it will invoke a page fault and the OS will read in the corresponding page in the related file to that mmap-ed page.
+- `munmap` the mmap-ed pages. It cannot unmap a hole in the virtual area.
+- After adding these features, the normal system operations like `fork()` and other illegal page faults are still processed correctly. 
+
+### Detailed Report
+
+**PLEASE SWITCH TO THE CORRECT BRANCH BY:**
+
+```
+$ git checkout mmap
+```
+
+**See the report in the branch `mmap`**
+
 # Test Results
 
 ## Lab 1
@@ -346,3 +364,7 @@ $ git checkout fs
 **Note**: *The `usertests` is __EVEN MORE TIME-CONSUMING__. If your computer has a weak performance, the `usertests` may fail because of time out.*
 
 ![image-20211228210129777](README.assets/image-20211228210129777.png)
+
+## Lab 10
+
+![image-20220107144039429](README.assets/image-20220107144039429.png)
