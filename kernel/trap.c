@@ -83,7 +83,7 @@ usertrap(void)
     // page fault
     uint64 va = r_stval();
     pte_t *pte = walk(p->pagetable, va, 0);
-    if (*pte == 0) {
+    if (pte == 0) {
       printf("the vma %p is not mapped!\n", va);
       goto unexpected;
     }
@@ -114,13 +114,15 @@ usertrap(void)
       if (vma->prot & PROT_EXEC) flag |= PTE_X;
       mappages(p->pagetable, va, PGSIZE, (uint64)new_mem,
                PTE_M | PTE_U | flag);
+    } else {
+      goto unexpected;
     }
   } else {
     unexpected:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
-  }
+    }
 
   if(p->killed)
     exit(-1);
