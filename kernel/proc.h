@@ -88,7 +88,7 @@ struct Vma {
   struct file *f;
   uint64 addr;
   uint64 length;
-  uint64 off;
+  uint64 offset;  // offset of the file at the moment of being mapped
   int prot;
   int flags;
 };

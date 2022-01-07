@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -88,27 +89,31 @@ usertrap(void)
     }
     if (*pte & PTE_M) {
       // it's a vma.
-      va = PGROUNDUP(va);
+      va = PGROUNDDOWN(va);
       // look up vmas to find the relevant file
       int i = 0;
       for (; i < MAXVMA; i++) {
-        if (p->vmas[i].addr + p->vmas[i].length >= PGROUNDUP(va)) break;
+        if (p->vmas[i].addr + p->vmas[i].length > va) break;
       }
-      if (i == MAXVMA) {
+      if (i == MAXVMA || va < p->vmas[i].addr) {
         printf("Did not find the vma %p in proc\n", va);
         goto unexpected;
       }
+      struct Vma *vma = &p->vmas[i];
       // allocate a physical memory
       char *new_mem = kalloc();
       memset(new_mem, 0, PGSIZE);
       // read in 4096 bytes from the relevant file
-      ilock(p->vmas[i].f->ip);
-      readi(p->vmas[i].f->ip, 0, (uint64)new_mem, p->vmas[i].off, PGSIZE);
-      p->vmas[i].off += PGSIZE;
-      iunlock(p->vmas[i].f->ip);
+      ilock(vma->f->ip);
+      readi(vma->f->ip, 0, (uint64)new_mem, vma->offset + va - vma->addr, PGSIZE);
+      iunlock(vma->f->ip);
       // map the physical mem to user space
+      int flag = 0;
+      if (vma->prot & PROT_READ) flag |= PTE_R;
+      if (vma->prot & PROT_WRITE) flag |= PTE_W;
+      if (vma->prot & PROT_EXEC) flag |= PTE_X;
       mappages(p->pagetable, va, PGSIZE, (uint64)new_mem,
-               PTE_M | PTE_R | PTE_U | PTE_W);
+               PTE_M | PTE_U | flag);
     }
   } else {
     unexpected:
