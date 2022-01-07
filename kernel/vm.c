@@ -174,8 +174,10 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+    if((*pte & PTE_V) == 0) {
+      // printf("uvmunmap: not mapped. va = %p, pte = %p\n", a, *pte);
+      continue;
+    }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free && !(PTE_FLAGS(*pte) == (PTE_M | PTE_V))) {
@@ -309,8 +311,20 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
-    if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+    if ((*pte & PTE_M) && !(*pte & PTE_U)) {
+      // process the lazy allocated vma seperately
+      flags = PTE_FLAGS(*pte);
+      // printf("uvmvopy(): map empty vma: %d with flags: %x\n", i, flags);
+      if (mappages(new, i, PGSIZE, 0, flags) != 0) {
+        goto err;
+      }
+      continue;
+    }
+    if((*pte & PTE_V) == 0) {
+      // Because there may be gap between unused process space and VMA
+      // We should skip these empty space
+      continue;
+    }
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)

@@ -281,6 +281,12 @@ fork(void)
     return -1;
   }
 
+  // Copy vma.
+  for (i = 0; i < MAXVMA; i++) {
+    np->vmas[i] = p->vmas[i];
+    if (np->vmas[i].f) filedup(np->vmas[i].f);  // increase the file's ref count
+  }
+
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);

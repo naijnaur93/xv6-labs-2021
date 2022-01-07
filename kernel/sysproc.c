@@ -161,7 +161,7 @@ uint64 sys_mmap(void) {
   p->vmas[i].offset = offset;
   p->vmas[i].prot = prot;
   p->vmas[i].f = p->ofile[fd];
-  // printf("mmap: vma start addr: %p, length: %d\n", p->vmas[i].addr, p->vmas[i].length);
+  // printf("mmap: vma start addr: %p, length: %d, p->sz = %d\n", p->vmas[i].addr, p->vmas[i].length, p->sz);
 
   // map these vma pages. Since we apply lazy alloc, now pa is not available
   if (mappages(p->pagetable, addr, length, 0, PTE_M) < 0)
