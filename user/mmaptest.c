@@ -6,6 +6,7 @@
 #include "kernel/fs.h"
 #include "user/user.h"
 
+void enhanced_mmaptest();
 void mmap_test();
 void fork_test();
 char buf[BSIZE];
@@ -17,6 +18,21 @@ main(int argc, char *argv[])
 {
   mmap_test();
   fork_test();
+  if (fork() == 0) {
+    enhanced_mmaptest();
+    exit(0);
+  } else {
+    int xstate;
+    wait(&xstate);
+    if (xstate == 0) {
+      printf(
+          "ERROR: enhanced mmaptest should exit with `xstate != 0`, but xstate "
+          "= %d\n",
+          xstate);
+      exit(-1);
+    }
+    printf("enhanced mmaptest: OK\n");
+  }
   printf("mmaptest: all tests succeeded\n");
   exit(0);
 }
@@ -295,3 +311,50 @@ fork_test(void)
   printf("fork_test OK\n");
 }
 
+
+//
+// Enhanced test by: Zhijing Hu
+// Check random access. `_v1(p)` only checks sequential access
+// Since there are two pages in file `f`, I first test the content in the second page
+// Besides, it will cause an access out of the VMA range.
+// usertrap() should handle it
+//
+void enhanced_mmaptest() {
+  int fd;
+  int i;
+  const char *const f = "mmap.dur";
+  printf("enhanced_mmap_test starting\n");
+  testname = "enhanced_mmap_test";
+
+  makefile(f);
+  if ((fd = open(f, O_RDONLY)) == -1) err("open");
+
+  printf("test mmap f (random access)\n");
+
+  char *p = mmap(0, PGSIZE * 2, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (p == MAP_FAILED) {
+    err("mmap (1) enhanced");
+  }
+
+  p += PGSIZE;  // check the second page's content
+  for (i = 0; i < 2 * PGSIZE; i++) {
+    if (i < PGSIZE / 2 && p[i] != 'A') {
+      printf("mismatched at %p, expected 'A', got %p\n", p + i,
+             p[i]);
+      err("Enhanced test failed");
+    }
+    if (i >= PGSIZE / 2 && i < PGSIZE && p[i] != 0) {
+      printf("mismatched at %p, expected 0, got %p\n", p + i,
+             p[i]);
+      err("Enhanced test failed");
+    }
+    if (i >= PGSIZE) {
+      // When executing the following statement, the process should be killed
+      printf("unexpected value p[%d] = %p, out of VMA range!\n", i, p[i]);
+    }
+  }
+
+  if (munmap(p - PGSIZE, PGSIZE * 2) == -1) err("munmap (1) enhanced");
+}
+// -----------------------------------------------------
+//

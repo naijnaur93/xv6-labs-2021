@@ -1,3 +1,7 @@
+**Update on Jan 08, 2022:** I added an enhanced test in `mmaptest()` to ensure the correctness of random access to a VMA range. Besides, the test also probe the abnormal case in which the user program may try accessing an address out of its VMA. In this case, the user program should be killed.
+
+If you are interested, please refer to [`user/mmaptest.c`](user/mmaptest.c).
+
 # Lab 10 - mmap
 
 [Here](https://pdos.csail.mit.edu/6.S081/2021/labs/mmap.html) is the original lab specifics.
@@ -8,19 +12,21 @@
 
 - `munmap(addr, length)` should remove `mmap` mappings in the indicated address range. If the process has modified the memory and has it mapped `MAP_SHARED`, the modifications should first be written to the file. An `munmap` call might cover only a portion of an mmap-ed region, but you can assume that it will either unmap at the start, or at the end, or the whole region (but not punch a hole in the middle of a region).
 
-### Some hints from the lab
+## How Does `mmap` Work?
 
-Here are some hints:
+In my implementation, when `mmap` is called:
 
-- Start by adding `_mmaptest` to `UPROGS`, and `mmap` and `munmap` system calls, in order to get `user/mmaptest.c` to compile. For now, just return errors from `mmap` and `munmap`. We defined `PROT_READ` etc for you in `kernel/fcntl.h`. Run `mmaptest`, which will fail at the first mmap call.
-- Fill in the page table lazily, in response to page faults. That is, `mmap` should not allocate physical memory or read the file. Instead, do that in page fault handling code in (or called by) `usertrap`, as in the lazy page allocation lab. The reason to be lazy is to ensure that `mmap` of a large file is fast, and that `mmap` of a file larger than physical memory is possible.
-- Keep track of what `mmap` has mapped for each process. Define a structure corresponding to the VMA (virtual memory area) described in Lecture 15, recording the address, length, permissions, file, etc. for a virtual memory range created by `mmap`. Since the xv6 kernel doesn't have a memory allocator in the kernel, it's OK to declare a fixed-size array of VMAs and allocate from that array as needed. A size of 16 should be sufficient.
-- Implement `mmap`: find an unused region in the process's address space in which to map the file, and add a VMA to the process's table of mapped regions. The VMA should contain a pointer to a `struct file` for the file being mapped; `mmap` should increase the file's reference count so that the structure doesn't disappear when the file is closed (hint: see `filedup`). Run `mmaptest`: the first `mmap` should succeed, but the first access to the mmap-ed memory will cause a page fault and kill `mmaptest`.
-- Add code to cause a page-fault in a mmap-ed region to allocate a page of physical memory, read 4096 bytes of the relevant file into that page, and map it into the user address space. Read the file with `readi`, which takes an offset argument at which to read in the file (but you will have to lock/unlock the inode passed to `readi`). Don't forget to set the permissions correctly on the page. Run `mmaptest`; it should get to the first `munmap`.
-- Implement `munmap`: find the VMA for the address range and unmap the specified pages (hint: use `uvmunmap`). If `munmap` removes all pages of a previous `mmap`, it should decrement the reference count of the corresponding `struct file`. If an unmapped page has been modified and the file is mapped `MAP_SHARED`, write the page back to the file. Look at `filewrite` for inspiration.
-- Ideally your implementation would only write back `MAP_SHARED` pages that the program actually modified. The dirty bit (`D`) in the RISC-V PTE indicates whether a page has been written. However, `mmaptest` does not check that non-dirty pages are not written back; thus you can get away with writing pages back without looking at `D` bits.
-- Modify `exit` to unmap the process's mapped regions as if `munmap` had been called. Run `mmaptest`; `mmap_test` should pass, but probably not `fork_test`.
-- Modify `fork` to ensure that the child has the same mapped regions as the parent. Don't forget to increment the reference count for a VMA's `struct file`. In the page fault handler of the child, it is OK to allocate a new physical page instead of sharing a page with the parent. The latter would be cooler, but it would require more implementation work. Run `mmaptest`; it should pass both `mmap_test` and `fork_test`.
+1. The kernel will allocate a range of page-aligned address in the user space as Virtual Memory Area by increasing `myproc()->sz`, and mark their PTEs with ONLY `PTE_W`, which means they are VMA pages. 
+
+2. I do not give them any other permissions because they are currently not associated with a physical page, so any read/write operation on them should raise a page fault to `usertrap`.
+
+3. When the user program want to access these VMA pages, `usertrap` will handle the page fault and read in corresponding pages from the file mapped to, then set the PTEs with `PROT | PTE_U`. **Here `PTE_U` not only means that the user program can access the VMA page, but also means that the VMA page is associated with a physical page. It is important because the `uvmfree(), uvmcopy(), etc` functions can distinguish VMA pages with no physical page and VMA pages associated with physical pages.**
+
+4. User programs usually claims more space than they needed when they are executed. Usually it's not a problem, but `mmap` will cause a gap between the VMA and the program space. For example: 
+
+   ![](README.assets/pic.svg)
+
+   In this case, `uvmcopy()` should skip the unused PTEs between the user program and the VMA. 
 
 ## Solution
 
